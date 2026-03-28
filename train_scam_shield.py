@@ -61,17 +61,22 @@ def train_model():
     print("\n3. Splitting into training (80%) and testing (20%) sets...")
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
-    # 4. Vectorize Text
-    print("\n4. Vectorizing text (Extracting keywords like 'CBI', 'Aadhar', 'OTP')...")
-    # ngram_range=(1,2) helps catch phrases like "digital arrest" and "mumbai police"
-    vectorizer = TfidfVectorizer(max_features=10000, ngram_range=(1, 2)) 
+# 4. Vectorize Text (Reduced max_features from 10000 to 5000 to save space)
+    print("\n4. Vectorizing text...")
+    vectorizer = TfidfVectorizer(max_features=5000, ngram_range=(1, 2)) 
     X_train_vec = vectorizer.fit_transform(X_train)
     X_test_vec = vectorizer.transform(X_test)
 
-# 5. Train Model
-    print("\n5. Training Random Forest Classifier...")
-    # MAGIC FIX: 'class_weight="balanced"' forces the AI to pay extreme attention to the 65 Digital Arrest rows!
-    model = RandomForestClassifier(n_estimators=100, random_state=42, n_jobs=-1, class_weight='balanced')
+    # 5. Train Lighter Model
+    print("\n5. Training pruned Random Forest Classifier...")
+    # FIX: Reduced trees to 50, added max_depth=20 to stop the file from ballooning!
+    model = RandomForestClassifier(
+        n_estimators=50, 
+        max_depth=20, 
+        random_state=42, 
+        n_jobs=-1, 
+        class_weight='balanced'
+    )
     model.fit(X_train_vec, y_train)
 
     # 6. Evaluate Model
@@ -79,11 +84,12 @@ def train_model():
     y_pred = model.predict(X_test_vec)
     print(classification_report(y_test, y_pred))
 
-    # 7. Save Models
-    print("\n6. Saving trained models for the backend...")
+    # 7. Save Models (WITH COMPRESSION)
+    print("\n6. Saving trained models for the backend (Compressing...)")
     
-    joblib.dump(model, model_path)
-    joblib.dump(vectorizer, vec_path)
+    # FIX: Added compress=3. This heavily zips the .pkl file!
+    joblib.dump(model, model_path, compress=3)
+    joblib.dump(vectorizer, vec_path, compress=3)
     
     print(f"   SUCCESS! Model saved as: scam_shield_rf_model.pkl")
     print(f"   SUCCESS! Vectorizer saved as: scam_shield_vectorizer.pkl")

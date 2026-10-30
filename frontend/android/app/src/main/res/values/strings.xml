@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Scam Shield</string>
+    <string name="title_activity_main">Scam Shield</string>
+    <string name="package_name">com.scam.shield</string>
+    <string name="custom_url_scheme">com.scam.shield</string>
+</resources>

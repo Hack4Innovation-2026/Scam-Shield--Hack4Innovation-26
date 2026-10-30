@@ -1,5 +1,8 @@
 {
   "appId": "com.scam.shield",
-  "appName": "ScamShield",
-  "webDir": "dist"
+  "appName": "Scam Shield",
+  "webDir": "dist",
+  "android": {
+    "allowMixedContent": true
+  }
 }

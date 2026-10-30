@@ -22,7 +22,8 @@ def _csv(value: str) -> list[str]:
 MONGO_URI = _env("MONGO_URI")
 MONGO_DB = _env("MONGO_DB", "scam_detection_db")
 
-CORS_ORIGINS = _csv(_env("CORS_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173"))
+# https://localhost is the Android app (Capacitor WebView origin)
+CORS_ORIGINS = _csv(_env("CORS_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173,https://localhost"))
 
 MODELS_DIR = Path(_env("MODELS_DIR", str(BACKEND_DIR / "models")))
 

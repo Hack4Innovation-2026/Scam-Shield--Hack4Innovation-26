@@ -4,7 +4,15 @@
 // VITE_API_URL set    -> calls that origin directly (production, or the Android app, where the
 //                        emulator reaches the host machine at http://10.0.2.2:8000).
 
-const API_URL = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '');
+import { Capacitor } from '@capacitor/core';
+
+// Inside the Android app there is no dev proxy, so an absolute URL is required; 10.0.2.2 is the
+// emulator's alias for the development PC. Build with VITE_API_URL for a phone or a deployed API.
+const NATIVE_DEFAULT_API = 'http://10.0.2.2:8000';
+const API_URL = (import.meta.env.VITE_API_URL || (Capacitor.isNativePlatform() ? NATIVE_DEFAULT_API : '')).replace(/\/$/, '');
+
+// Absolute API base (the native background scanner needs one even when the web app uses the proxy).
+export const API_BASE = API_URL || window.location.origin;
 const TIMEOUT_MS = 20000;
 const TOKEN_KEY = 'scamShieldToken';
 
@@ -41,7 +49,7 @@ const SOURCE_LABELS = {
 const sourceLabel = (s) => SOURCE_LABELS[s] || capitalize(s);
 
 // Backend snake_case response -> the camelCase shape the screens render.
-const toResult = (data, displaySource) => ({
+export const toResult = (data, displaySource) => ({
   riskScore: data.risk_score,
   level: data.level,
   scamType: humanize(data.scam_type),

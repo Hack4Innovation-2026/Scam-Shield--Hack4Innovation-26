@@ -1,20 +1,21 @@
 import React, { useState } from 'react';
 import { User, Shield, Bell, Lock, LogOut, ChevronRight, Moon, Sun, X } from 'lucide-react';
-import ScamShield from '../utils/ScamShieldPlugin';
+import { useAuth } from '../context/AuthContext';
+import { isNative, openNotificationAccessSettings } from '../native/nativeScanner';
 
 const SettingsScreen = ({ privacyMode, setPrivacyMode, isDarkMode, setIsDarkMode, onLogout }) => {
   const [popupData, setPopupData] = useState(null); // { title, message }
+  const { currentUser } = useAuth();
 
   const showPopup = (title, message) => {
     setPopupData({ title, message });
   };
 
-  const enableNativeListener = async () => {
-    try {
-       await ScamShield.openNotificationSettings();
-    } catch(e) {
-       console.log('Plugin unavailable', e);
-       showPopup("Web Environment", "You are running the Web Preview. Natively compile to APK to access Android OS system settings.");
+  const enableNativeListener = () => {
+    if (isNative) {
+      openNotificationAccessSettings();
+    } else {
+      showPopup("Android app feature", "Background scanning reads incoming notifications and SMS, which only the Android app can do. In the browser, paste messages on the Scan screen.");
     }
   };
 
@@ -29,8 +30,8 @@ const SettingsScreen = ({ privacyMode, setPrivacyMode, isDarkMode, setIsDarkMode
           <User size={32} color="white" />
         </div>
         <div>
-          <h2 className="text-h2" style={{ margin: 0, fontSize: '1.25rem' }}>Guest User</h2>
-          <p className="text-sub">Basic Protection Plan</p>
+          <h2 className="text-h2" style={{ margin: 0, fontSize: '1.25rem' }}>{currentUser ? currentUser.name : 'Guest'}</h2>
+          <p className="text-sub">{currentUser ? currentUser.email : 'History saved on this device only'}</p>
         </div>
       </div>
 
@@ -67,8 +68,8 @@ const SettingsScreen = ({ privacyMode, setPrivacyMode, isDarkMode, setIsDarkMode
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
             <Bell size={20} className="text-warning" />
             <div>
-              <p style={{ fontWeight: 500, margin: 0 }}>Enable Background Auto-Scanner</p>
-              <p className="text-sub" style={{ fontSize: '0.75rem', margin: 0, marginTop: '0.25rem' }}>Grant Android OS-level Notification Access</p>
+              <p style={{ fontWeight: 500, margin: 0 }}>Background scanning</p>
+              <p className="text-sub" style={{ fontSize: '0.75rem', margin: 0, marginTop: '0.25rem' }}>{isNative ? 'Manage notification access' : 'Available in the Android app'}</p>
             </div>
           </div>
           <ChevronRight size={20} className="text-secondary" />
@@ -76,13 +77,13 @@ const SettingsScreen = ({ privacyMode, setPrivacyMode, isDarkMode, setIsDarkMode
 
         <div 
           style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '1rem 0', cursor: 'pointer' }}
-          onClick={() => showPopup("Engine Version", "Scam Shield AI v2.4.1\n\n- Improved Phishing URL Regex\n- Added Urgency NLP Intent matching\n- Trained on 50M+ Kaggle Scam Datasets")}
+          onClick={() => showPopup("Detection engine", "Scam Shield 1.1\n\n- Link analysis: shorteners, suspicious TLDs, raw IPs, look-alike domains\n- Behavioural patterns: urgency, fear, reward, authority\n- ML text models: TF-IDF + Random Forest (SMS), Random Forest (email)")}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
             <Shield size={20} className="text-primary" />
             <div>
               <p style={{ fontWeight: 500, margin: 0 }}>Engine Version</p>
-              <p className="text-sub" style={{ fontSize: '0.75rem', margin: 0, marginTop: '0.25rem' }}>Scam Shield AI v2.4.1 (Online)</p>
+              <p className="text-sub" style={{ fontSize: '0.75rem', margin: 0, marginTop: '0.25rem' }}>Scam Shield 1.1</p>
             </div>
           </div>
           <ChevronRight size={20} className="text-secondary" />

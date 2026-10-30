@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import PermissionScreen from './screens/PermissionScreen';
 import LoginScreen from './screens/LoginScreen';
 import WalkthroughScreen from './screens/WalkthroughScreen';
@@ -12,11 +12,12 @@ import SettingsScreen from './screens/SettingsScreen';
 import NotificationSimulation from './components/NotificationSimulation';
 import { Home, Scan, Clock, Settings } from 'lucide-react';
 import { useAuth } from './context/AuthContext';
-import { analyzeText } from './api/client';
 import { loadHistory, saveScan } from './utils/historyStore';
-import ScamShield from './utils/ScamShieldPlugin';
+import { syncNativeConfig, subscribeToNativeScans } from './native/nativeScanner';
 function App() {
   const { currentUser, logout } = useAuth();
+  const currentUserRef = useRef(currentUser);
+  useEffect(() => { currentUserRef.current = currentUser; }, [currentUser]);
   const [permissionsGranted, setPermissionsGranted] = useState(() => {
     return localStorage.getItem('scamShieldPermissions') === 'true';
   });
@@ -54,54 +55,27 @@ function App() {
     }
   }, [isDarkMode]);
 
-  // Native Notification Bridge
+  // Android: keep the background scanner's API address and login token in sync with the app.
   useEffect(() => {
-    let nativeListener;
-    const initializeNativeBridge = async () => {
-      try {
-        nativeListener = await ScamShield.addListener('notificationReceived', async (data) => {
-           console.log("[Native Notification Intercepted]", data);
-           if (!data || !data.text) return;
+    syncNativeConfig();
+  }, [currentUser]);
 
-           const analysisPayload = {
-             type: 'text',
-             source: data.app || 'Native App',
-             text: (data.title || '') + " " + data.text
-           };
-
-           let result;
-           try {
-             result = await analyzeText(analysisPayload.text, 'notifications');
-           } catch (err) {
-             console.warn('Notification scan failed:', err.message);
-             return;
-           }
-           if (result.riskScore >= 70) {
-              // Trigger Native Android Toast matching user request, including percentage!
-              await ScamShield.showToast({ text: `⚠ Scam message detected! Risk: ${result.riskScore}%` });
-              
-              setNotificationData({
-                app: data.app || 'Unknown Native Source',
-                sender: data.title || 'System Alert',
-                text: analysisPayload.text
-              });
-              setShowNotification(true);
-           }
-        });
-      } catch (e) {
-         console.log("Native API bridge unavailable", e);
+  // Android: results of background scans (notifications / SMS) and taps on scam alerts.
+  useEffect(() => subscribeToNativeScans({
+    onScan: (record) => {
+      setHistory(prev => [record, ...prev]);
+      // Signed-in scans are already saved on the server; guests keep them on the device.
+      saveScan(currentUserRef.current, record).catch(() => {});
+      if (record.riskScore >= 70) {
+        setNotificationData({ app: record.source, sender: record.scamType, text: record.scannedText, record });
+        setShowNotification(true);
       }
-    };
-    
-    initializeNativeBridge();
-    
-    return () => {
-       if (nativeListener) nativeListener.remove();
-    };
-  }, []);
-
-  // Background Message Simulator removed per user request. 
-  // The app now relies 100% on the Native Event bridge (lines 49-87) to read real device notifications!
+    },
+    onOpen: (record) => {
+      setScanResult(record);
+      setCurrentScreen('result');
+    },
+  }), []);
 
   const navigateTo = (screen, data = null) => {
     if (data && screen === 'processing') {
@@ -147,11 +121,8 @@ function App() {
 
   const handleNotificationClick = () => {
     setShowNotification(false);
-    startScan({
-      type: 'text',
-      source: notificationData.app,
-      text: notificationData.text
-    });
+    setScanResult(notificationData.record);
+    setCurrentScreen('result');
   };
 
   const handleNotificationDismiss = () => {

@@ -1,0 +1,19 @@
+# Render Blueprint: deploys the backend API from backend/Dockerfile.
+# Render dashboard -> New -> Blueprint -> select this repository.
+services:
+  - type: web
+    name: scam-shield-api
+    runtime: docker
+    rootDir: backend
+    dockerfilePath: ./Dockerfile
+    plan: free
+    healthCheckPath: /
+    envVars:
+      - key: MONGO_URI          # MongoDB Atlas connection string (set in the dashboard)
+        sync: false
+      - key: CORS_ORIGINS       # e.g. https://scam-shield.vercel.app
+        sync: false
+      - key: MONGO_DB
+        value: scam_detection_db
+      - key: WEB_CONCURRENCY
+        value: "1"

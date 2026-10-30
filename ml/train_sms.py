@@ -16,9 +16,10 @@ def train_model():
         BASE_DIR = os.getcwd()
         
     # Dynamically build the paths to the files
-    csv_path = os.path.join(BASE_DIR, 'sms_scam_detection_dataset_merged_with_lang.csv')
-    model_path = os.path.join(BASE_DIR, 'scam_shield_rf_model.pkl')
-    vec_path = os.path.join(BASE_DIR, 'scam_shield_vectorizer.pkl')
+    csv_path = os.path.join(BASE_DIR, 'data', 'sms_scam_detection_dataset_merged_with_lang.csv')
+    models_dir = os.path.join(os.path.dirname(BASE_DIR), 'backend', 'models')
+    model_path = os.path.join(models_dir, 'sms_model.pkl')
+    vec_path = os.path.join(models_dir, 'sms_vectorizer.pkl')
     
     print("--- SCAM SHIELD V2 TRAINING STARTED ---")
     print(f"Looking for dataset at: {csv_path}")
@@ -59,7 +60,7 @@ def train_model():
 
     # 3. Split Data
     print("\n3. Splitting into training (80%) and testing (20%) sets...")
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
 
 # 4. Vectorize Text (Reduced max_features from 10000 to 5000 to save space)
     print("\n4. Vectorizing text...")
@@ -91,9 +92,7 @@ def train_model():
     joblib.dump(model, model_path, compress=3)
     joblib.dump(vectorizer, vec_path, compress=3)
     
-    print(f"   SUCCESS! Model saved as: scam_shield_rf_model.pkl")
-    print(f"   SUCCESS! Vectorizer saved as: scam_shield_vectorizer.pkl")
-    print(f"   Saved to: {BASE_DIR}")
+    print(f"   Saved to: {models_dir}")
     print("\n--- TRAINING COMPLETE. YOU ARE READY FOR THE HACKATHON! ---")
 
 if __name__ == "__main__":

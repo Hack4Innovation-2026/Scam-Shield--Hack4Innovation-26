@@ -1,14 +1,18 @@
 import pandas as pd
 import string
 import pickle
-import os  
+import os
+
+ML_DIR = os.path.dirname(os.path.abspath(__file__))
+DATA_DIR = os.path.join(ML_DIR, 'data')
+MODELS_DIR = os.path.join(os.path.dirname(ML_DIR), 'backend', 'models')
 from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
 
 print("--- Starting AI Retraining Process ---")
 
-with open('C:\\Users\\aatha\\OneDrive\\Desktop\\Atharva\\emailpreprocess_tools.pkl', 'rb') as f:
+with open(os.path.join(MODELS_DIR, 'email_preprocess_tools.pkl'), 'rb') as f:
     tools = pickle.load(f)
     stemmer = tools['stemmer']
     stopwords_set = tools['stopwords']
@@ -20,9 +24,9 @@ def clean_text(text):
     return ' '.join(text)
 
 print("Loading original and new datasets...")
-old_data =  pd.read_csv('C:\\Users\\aatha\\OneDrive\\Desktop\\Atharva\\processed_data.csv')
+old_data =  pd.read_csv(os.path.join(DATA_DIR, 'processed_data.csv'))
 
-new_data_path = 'C:\\Users\\aatha\\OneDrive\\Desktop\\Atharva\\new_approved_scams.csv'
+new_data_path = os.path.join(DATA_DIR, 'new_approved_scams.csv')
 
 
 if not os.path.exists(new_data_path):
@@ -50,7 +54,7 @@ combined_data = pd.concat([
 ], ignore_index=True)
 
 combined_data.dropna(subset=['clean_text'], inplace=True)
-combined_data.to_csv('C:\\Users\\aatha\\OneDrive\\Desktop\\Atharva\\processed_data.csv', index=False)
+combined_data.to_csv(os.path.join(DATA_DIR, 'processed_data.csv'), index=False)
 print(f"Total dataset size is now: {len(combined_data)} messages.")
 
 print("Re-building vocabulary to learn new scam words...")
@@ -59,7 +63,7 @@ X = vectorizer.fit_transform(combined_data['clean_text'])
 y = combined_data['label_num']
 
 print("Training the updated AI model...")
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
 
 clf = RandomForestClassifier(n_jobs=-1, n_estimators=100)
 clf.fit(X_train, y_train)
@@ -70,10 +74,10 @@ print(f"New Model Accuracy: {accuracy:.2%}")
 if accuracy > 0.90:
     print("Saving updated 'Brain' files for the backend...")
     
-    with open('C:\\Users\\aatha\\OneDrive\\Desktop\\Atharva\\emailvectorizer.pkl', 'wb') as f:
+    with open(os.path.join(MODELS_DIR, 'email_vectorizer.pkl'), 'wb') as f:
         pickle.dump(vectorizer, f)
         
-    with open('C:\\Users\\aatha\\OneDrive\\Desktop\\Atharva\\emailscam_model.pkl', 'wb') as f:
+    with open(os.path.join(MODELS_DIR, 'email_model.pkl'), 'wb') as f:
         pickle.dump(clf, f)
         
     print("--- Retraining Complete! Backend will now detect the new scams. ---")

@@ -6,15 +6,16 @@ from datetime import datetime
 
 # PERMANENT FIX: Always look in the folder where THIS script is saved
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+MODELS_DIR = os.path.join(os.path.dirname(BASE_DIR), 'backend', 'models')
 
 # Load models safely
 try:
-    vectorizer = joblib.load(os.path.join(BASE_DIR, 'scam_shield_vectorizer.pkl'))
-    model = joblib.load(os.path.join(BASE_DIR, 'scam_shield_rf_model.pkl'))
+    vectorizer = joblib.load(os.path.join(MODELS_DIR, 'sms_vectorizer.pkl'))
+    model = joblib.load(os.path.join(MODELS_DIR, 'sms_model.pkl'))
     print("Models loaded successfully from:", BASE_DIR)
 except FileNotFoundError:
     print(f"\nCRITICAL ERROR: ML Models not found in {BASE_DIR}")
-    print("Please ensure 'scam_shield_vectorizer.pkl' and 'scam_shield_rf_model.pkl' are in that folder.")
+    print("Please ensure 'sms_vectorizer.pkl' and 'sms_model.pkl' are in that folder.")
     sys.exit(1)
 
 # --- DATA COLLECTION FOR FUTURE AI TRAINING ---

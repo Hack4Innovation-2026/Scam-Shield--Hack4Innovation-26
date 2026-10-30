@@ -74,7 +74,7 @@ backend/            FastAPI service
   app/services/     url_analyzer, behavioral_engine, ml_engine, ocr, risk_scorer, ...
   app/schemas/      pydantic request/response models
   models/           pickled vectorizers + classifiers
-  tests/            pytest suite (52 tests)
+  tests/            pytest suite (59 tests)
   Dockerfile
 frontend/           React 19 + Vite + Capacitor app
   src/api/client.js backend client (the only place that talks to the API)

@@ -109,3 +109,19 @@ def test_advice_handles_combined_intents():
     from app.services.advice_engine import generate_advice
     advice = generate_advice([], "fear / urgency", DIGITAL_ARREST_SMS)
     assert "authorities" in advice.lower()
+
+
+@pytest.mark.parametrize("text", [
+    "Login at http://192.168.10.5/login now",
+    "Server 10.0.0.12 is down",
+    "Track at https://track.example.com/order/123456789 today",
+])
+def test_pii_masking_leaves_links_and_ips_intact(text):
+    # Regression: the phone pattern turned 192.168.10.5 into "[PHONE].5" in stored records.
+    assert process_and_mask_pii(text) == text
+
+
+def test_pii_masking_still_masks_numbers_next_to_links():
+    masked = process_and_mask_pii("Call 9876543210 or visit http://bit.ly/x, OTP 482913")
+    assert "http://bit.ly/x" in masked
+    assert "9876543210" not in masked and "482913" not in masked

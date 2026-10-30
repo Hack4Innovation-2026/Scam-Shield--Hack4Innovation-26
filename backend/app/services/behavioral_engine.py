@@ -1,10 +1,10 @@
 import re
 
 PATTERNS = {
-    "urgency": r"\b(act now|immediate action|urgent|soon|limited time|hurry|final notice|expires)\b",
-    "fear": r"\b(police|blocked|suspended|compromised|arrest|fraud|illegal|fine|court|lawsuit)\b",
-    "reward": r"\b(lottery|prize|winner|free|bonus|gift|cash prize|jackpot|claim|crypto|giveaway)\b",
-    "authority": r"\b(bank|irs|tax|gov|government|support|security|officer|manager|official)\b"
+    "urgency": r"\b(act now|immediate action|immediately|urgent|urgently|limited time|hurry|final notice|expires|expiring|within 24 hours|last chance|do not disconnect)\b",
+    "fear": r"\b(police|blocked|suspended|compromised|arrest|digital arrest|fraud|illegal|fine|court|lawsuit|money laundering|unauthori[sz]ed|legal action|warrant)\b",
+    "reward": r"\b(lottery|prize|winner|won|free|bonus|gift|cash prize|jackpot|claim|crypto|giveaway|cashback)\b",
+    "authority": r"\b(bank|irs|tax|gov|government|support|security|officer|manager|official|kyc|aadhaa?r|rbi|cbi|customs|cyber cell)\b"
 }
 
 def analyze_intent(text: str) -> dict:

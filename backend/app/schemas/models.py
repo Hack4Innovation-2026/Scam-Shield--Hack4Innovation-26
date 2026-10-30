@@ -1,31 +1,58 @@
-from pydantic import BaseModel, HttpUrl
+from pydantic import BaseModel, Field, field_validator
 from typing import Optional, List, Dict, Any
 
+MAX_TEXT_LENGTH = 20_000
+
+
 class AnalysisRequest(BaseModel):
-    text: str
-    source: str  # e.g., 'sms', 'email', 'notifications', 'image'
+    text: str = Field(min_length=1, max_length=MAX_TEXT_LENGTH)
+    source: str = "sms"  # e.g. 'sms', 'whatsapp', 'notifications'
     metadata: Optional[Dict[str, Any]] = None
 
     model_config = {
         "json_schema_extra": {
             "example": {
-                "text": "Urgent! Click here to verify your account.",
+                "text": "Urgent! Your account is blocked. Verify at http://bit.ly/secure-acc",
                 "source": "sms",
                 "metadata": {}
             }
         }
     }
 
+
 class EmailAnalysisRequest(BaseModel):
-    subject: str
-    body: str
-    sender_email: str
+    subject: str = Field(default="", max_length=1_000)
+    body: str = Field(max_length=MAX_TEXT_LENGTH)
+    sender_email: str = Field(min_length=3, max_length=320)
     metadata: Optional[Dict[str, Any]] = None
+
+
+class UrlAnalysisRequest(BaseModel):
+    url: str = Field(min_length=4, max_length=2_048)
+
+    @field_validator("url")
+    @classmethod
+    def must_look_like_url(cls, v: str) -> str:
+        from app.services.url_analyzer import extract_urls
+        v = v.strip()
+        if " " in v or not extract_urls(v):
+            raise ValueError("Not a valid URL")
+        return v
+
+    model_config = {"json_schema_extra": {"example": {"url": "http://sbi-kyc-update.xyz/login"}}}
+
 
 class ReportDetails(BaseModel):
     report_recommended: bool
     report_link: str
     report_summary: str
+
+
+class SignalScores(BaseModel):
+    url: Optional[float] = None
+    behavioral: Optional[float] = None
+    ml: Optional[float] = None
+
 
 class AnalysisResponse(BaseModel):
     risk_score: int
@@ -40,3 +67,6 @@ class AnalysisResponse(BaseModel):
     url_flags: List[str]
     source: str
     report: ReportDetails
+    signals: SignalScores
+    ml_category: Optional[str] = None
+    extracted_text: Optional[str] = None

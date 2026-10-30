@@ -1,12 +1,18 @@
-import joblib
+"""Text classifiers. Returns the model's own probability; rule-based signals live in other engines."""
 import logging
-import re
+import pickle
+import string
+
+import joblib
 
 from app import config
 
 logger = logging.getLogger(__name__)
 
 MODEL_SOURCES = ("sms", "email")
+
+# Label the SMS model uses for legitimate messages; every other class is a scam category.
+SAFE_LABEL = "safe"
 
 _cache = {}
 
@@ -21,6 +27,14 @@ def load_models():
                 missing.append(str(path))
                 continue
             _cache[f"{source}_{kind}"] = joblib.load(path)
+
+    tools_path = config.MODELS_DIR / "email_preprocess_tools.pkl"
+    if tools_path.exists():
+        with open(tools_path, "rb") as f:
+            _cache["email_tools"] = pickle.load(f)
+    else:
+        missing.append(str(tools_path))
+
     if missing:
         raise RuntimeError("Missing model files: " + ", ".join(missing))
     logger.info("Loaded models from %s", config.MODELS_DIR)
@@ -30,113 +44,41 @@ def models_loaded() -> bool:
     return all(f"{s}_model" in _cache for s in MODEL_SOURCES)
 
 
+def model_source_for(source: str) -> str:
+    """Map an input channel ('SMS', 'WhatsApp', 'notifications', 'image', ...) to a model."""
+    return "email" if source.strip().lower() == "email" else "sms"
+
+
+def clean_email_text(text: str) -> str:
+    """Same preprocessing the email model was trained with (see ml/scamemail.ipynb)."""
+    tools = _cache["email_tools"]
+    stemmer, stopwords = tools["stemmer"], tools["stopwords"]
+    words = str(text).replace("\r\n", "").lower().translate(str.maketrans("", "", string.punctuation)).split()
+    return " ".join(stemmer.stem(w) for w in words if w not in stopwords)
+
+
 def get_ml_prediction(text: str, source: str) -> dict:
-    valid_sources = ["sms", "email", "notifications"]
-    if source not in valid_sources:
-        source = "sms"
+    model_source = model_source_for(source)
+    model = _cache.get(f"{model_source}_model")
+    vectorizer = _cache.get(f"{model_source}_vectorizer")
+    if model is None or vectorizer is None:
+        return {"ml_prediction": "unknown", "ml_category": None, "ml_risk_score": None}
 
-    if source == "notifications":
-        import random
-        return {
-            "ml_prediction": "scam" if random.random() > 0.3 else "safe",
-            "ml_risk_score": round(random.uniform(40.0, 90.0), 2)
-        }
+    features_text = clean_email_text(text) if model_source == "email" else text
+    X = vectorizer.transform([features_text])
+    probs = dict(zip(model.classes_, model.predict_proba(X)[0]))
 
-    model_key = f"{source}_model"
-    vec_key = f"{source}_vectorizer"
+    if model_source == "email":
+        # Binary model: classes are [0, 1] with 1 = spam/scam.
+        scam_prob = float(probs.get(1, 0.0))
+        category = "spam" if scam_prob >= 0.5 else SAFE_LABEL
+    else:
+        # Multi-class model: [digital_arrest, general_spam, safe]. P(scam) is everything but safe.
+        scam_prob = 1.0 - float(probs.get(SAFE_LABEL, 0.0))
+        category = str(max(probs, key=probs.get))
 
-    if model_key not in _cache:
-        return {
-            "ml_prediction": "unknown",
-            "ml_risk_score": 0.0
-        }
-
-    model = _cache[model_key]
-    vectorizer = _cache[vec_key]
-
-    try:
-        X = vectorizer.transform([text])
-        prediction = model.predict(X)[0]
-
-        if hasattr(model, "predict_proba"):
-            probs = model.predict_proba(X)[0]
-            scam_prob = probs[1] * 100
-        else:
-            scam_prob = float(prediction) * 100.0
-
-        text_lower = text.lower()
-
-        # Amplify ML model's baseline to make percentage inherently higher naturally if it leans scam
-        if prediction == 1 or scam_prob > 40.0:
-            scam_prob = min(99.0, scam_prob * 1.3) # Scaled up ML prediction base
-
-        # 🚨 KEYWORDS (Scaled down to maintain ML as the primary source of truth)
-        instant_scam_keywords = [
-            "otp", "share otp", "upi pin", "password", "cvv",
-            "verify your account", "account suspended", "unauthorized access",
-            "click this link to secure", "login immediately"
-        ]
-
-        total_boost = 0
-        for kw in instant_scam_keywords:
-            if kw in text_lower:
-                total_boost += 30.0  # Large boost, but no longer instantly overrides ML unless ML is borderline
-                break
-
-        keyword_categories = {
-            "critical": ["bank", "upi", "pin", "kyc", "login", "verify", "blocked", "suspended", "security alert", "fraud alert"],
-            "financial": ["refund", "cashback", "loan", "credit card", "transaction failed", "payment issue", "wallet"],
-            "urgency": ["urgent", "immediately", "act now", "limited time", "expires today"],
-            "scam_patterns": ["click here", "claim now", "free gift", "winner", "lottery", "congratulations"],
-            "delivery": ["parcel", "courier", "delivery failed", "track package", "address issue"],
-            "job": ["job offer", "earn money", "work from home", "salary", "investment", "double your money"]
-        }
-
-        # Moderated weights so ML is the center
-        weights = {
-            "critical": 12,
-            "financial": 8,
-            "urgency": 8,
-            "scam_patterns": 10,
-            "delivery": 6,
-            "job": 8
-        }
-
-        category_hits = 0
-        for category, keywords in keyword_categories.items():
-            hits = sum(1 for kw in keywords if kw in text_lower)
-            if hits > 0:
-                category_hits += 1
-                total_boost += hits * weights[category]
-
-        if category_hits >= 2:
-            total_boost *= 1.2
-        
-        if re.search(r"http[s]?://", text_lower):
-            total_boost += 15
-
-        if re.search(r"\b\d{10}\b", text_lower):
-            total_boost += 8
-
-        if text.isupper():
-            total_boost += 5
-
-        # Apply scaled down keyword boost
-        scam_prob = min(100.0, scam_prob + total_boost)
-
-        if scam_prob >= 50:
-            prediction = 1
-        else:
-            prediction = 0
-
-        return {
-            "ml_prediction": "scam" if prediction == 1 else "safe",
-            "ml_risk_score": round(scam_prob, 2)
-        }
-
-    except Exception as e:
-        print(f"ML Pipeline error: {e}")
-        return {
-            "ml_prediction": "error",
-            "ml_risk_score": 0.0
-        }
+    return {
+        "ml_prediction": "scam" if scam_prob >= 0.5 else "safe",
+        "ml_category": category,
+        "ml_risk_score": round(scam_prob * 100, 2),
+    }

@@ -238,3 +238,37 @@ You also need to enable the Email/Password (and Google) sign-in providers, add `
 | Image scanning | Real OCR with Tesseract. Return 503 if the binary isn't installed. |
 | Call tab / offline mock | Hide the call tab. Show an explicit error when the backend is unreachable. No fabricated results. |
 | Restructure, artefact cleanup, keyword boosts | Approved. Run phases 0–5, one commit per phase. |
+
+---
+
+## 6. Phase 2 test log: code fixes vs test fixes
+
+Tests were written against the *intended* behaviour first, then run against the unmodified code.
+
+**Baseline (unmodified code):** 11 of 21 unit tests failed, and `test_endpoints.py` could not even be collected (no OCR module, no URL route).
+
+**Fixes in the code**, each one caught by a test:
+
+| Test | Bug | Fix |
+|---|---|---|
+| `test_sms_scam_probability_includes_digital_arrest_class` | B3/B4: `probs[1]` (= general_spam) used as P(scam); string label compared to `1` | `1 − P(safe)`, return `ml_category` |
+| `test_ml_score_is_pure_model_output` | H7: keyword boosts and a ×1.3 multiplier stacked on the model | removed; rules stay in `behavioral_engine` |
+| `test_email_model_uses_training_preprocessing` | B5: raw text fed to a model trained on stemmed text | `clean_email_text` using the pickled stemmer and stop-words |
+| `test_extract_urls_ignores_non_urls[...]` ×4, `..._ignores_email_addresses` | `Rs.500`, `e.g.`, `3.5`, `U.S.` and email domains were extracted as URLs | new URL regex (alpha TLD, `@` lookbehind, abbreviation filter) |
+| `test_shortener_match_is_exact_domain` | `"t.co" in "microsoft.com"` substring match | exact domain / subdomain match |
+| `test_scorer_ignores_missing_url_signal`, `test_scorer_url_only` | H8: fixed 40% URL weight capped link-free messages at 60 | weighted average over present signals + corroboration bonus |
+| `test_sms_scams_are_flagged_as_scam`, `test_digital_arrest_without_link_can_reach_scam` | link-free digital-arrest SMS scored 39 "safe" | the three fixes above, plus wider behavioural patterns (`immediately`, `money laundering`, `kyc`, `aadhaar`, …) |
+| `test_notifications_source_is_deterministic` | H2: random scores for notifications | routed to the SMS model |
+| `test_url_*` | M1: no URL endpoint | `POST /api/v1/analyze/url` |
+| `test_suspicious_sender_domain_is_flagged` | `sender_email` was accepted but never checked | sender domain run through the URL domain heuristics |
+| `test_sms_path_with_and_without_trailing_slash` | B10: 307 redirect without the slash | both paths registered |
+| `test_image_*` | M2/H3: hard-coded OCR text, no validation | Tesseract OCR, 415/413/400/422/503 handling |
+
+**Fixes after the first green-path run.** Three were code bugs in *my own* new code:
+- `extract_urls` dropped `http://192.168.10.5` and `https://t.co/...`, because the abbreviation filter also applied to explicit URLs. Now it applies only to bare matches.
+- A corrupt upload returned 503 (no Tesseract) instead of 400. The image is now validated before the OCR availability check.
+
+One was a test expectation:
+- `test_email_model_uses_training_preprocessing` asserted that a short benign email scores < 30. The real model gives it 43. That assertion tested model *quality*, not the pipeline. The test now asserts that the engine feeds the model exactly `clean_email_text(text)`.
+
+**Known model limitation (not fixed, documented).** The pickled SMS RandomForest is poorly calibrated: benign texts get P(not safe) ≈ 0.5. The scorer stops that alone from pushing benign messages over 40, but a legitimate bank OTP SMS still lands at 40 ("suspicious"). Phase 4 quantifies this.

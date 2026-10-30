@@ -1,3 +1,4 @@
+import os
 import sys
 from pathlib import Path
 
@@ -5,6 +6,11 @@ import pytest
 from fastapi.testclient import TestClient
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+# Never write test scans into the developer's real database from backend/.env.
+# Set before app.config loads: load_dotenv does not override existing variables, so this also
+# survives config reloads. Live persistence tests opt in via TEST_MONGO_URI (see test_database.py).
+os.environ["MONGO_URI"] = ""
 
 import main  # noqa: E402
 

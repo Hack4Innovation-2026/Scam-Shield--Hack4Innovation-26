@@ -1,3 +1,30 @@
-# Default ignored files
-/shelf/
-/workspace.xml
+# Node / Vite
+node_modules/
+dist/
+*.local
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+
+# ML data & outputs (datasets are downloaded, not committed)
+ml/data/
+ml/user_reported_data.csv
+
+# Android / Capacitor / IDE
+android/
+*.apk
+.gradle/
+.idea/
+*.iml
+local.properties
+
+# OS
+.DS_Store
+Thumbs.db

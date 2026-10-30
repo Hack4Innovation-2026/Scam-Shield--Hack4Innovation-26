@@ -15,7 +15,7 @@ A React (Vite + Capacitor) app is the client. It can be packaged for Android, wh
 
 Built for Hack4Innovation 2026.
 
-**Documentation:** [Data storage & MongoDB](docs/DATABASE.md) · [Deployment](docs/DEPLOYMENT.md) · [Changelog](CHANGELOG.md)
+**Documentation:** [Local setup](docs/SETUP.md) · [Data storage & MongoDB](docs/DATABASE.md) · [Deployment](docs/DEPLOYMENT.md) · [Changelog](CHANGELOG.md)
 
 ---
 
@@ -83,7 +83,8 @@ frontend/           React 19 + Vite + Capacitor app
 ml/                 training + evaluation scripts
   evaluate.py       model evaluation and comparison
   results/          metrics.md, metrics.json, pr_curves.png
-docs/               database and deployment guides
+docs/               setup, database and deployment guides
+scripts/            Windows setup.ps1 / start.ps1
 .github/workflows/  CI: tests, lint/build, Docker image
 render.yaml         Render deployment blueprint
 ```
@@ -91,6 +92,14 @@ render.yaml         Render deployment blueprint
 ---
 
 ## Quick start
+
+**Windows, two commands** (after installing Python 3.12+, Node 20+ and Git; full guide in [docs/SETUP.md](docs/SETUP.md)):
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\setup.ps1   # one-time setup
+powershell -ExecutionPolicy Bypass -File scripts\start.ps1   # starts backend + frontend, opens the app
+```
+
+Or set up each part manually:
 
 ### Backend
 ```bash

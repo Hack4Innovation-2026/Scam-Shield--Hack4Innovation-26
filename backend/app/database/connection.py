@@ -24,6 +24,9 @@ async def connect_to_mongo():
         # Indexes for the queries the stats endpoint runs (newest first, group by verdict).
         await db.analyzed_messages.create_index([("timestamp", -1)])
         await db.analyzed_messages.create_index([("level", 1), ("timestamp", -1)])
+        # Accounts: one user per email; each user's history newest first.
+        await db.users.create_index("email", unique=True)
+        await db.analyzed_messages.create_index([("user_id", 1), ("timestamp", -1)])
         logger.info("Connected to MongoDB database '%s'", config.MONGO_DB)
     except Exception as e:
         logger.warning("MongoDB unavailable (%s) - continuing without persistence", e)
@@ -86,3 +89,53 @@ async def get_scan_stats(days: int) -> dict:
         "by_source": counts("by_source"),
         "average_risk_score": round(avg, 1) if avg is not None else None,
     }
+
+
+# ---------------------------------------------------------------- accounts
+class EmailAlreadyRegistered(Exception):
+    pass
+
+
+def _public_user(doc: dict) -> dict:
+    return {"id": str(doc["_id"]), "name": doc["name"], "email": doc["email"],
+            "created_at": doc["created_at"].isoformat()}
+
+
+async def create_user(name: str, email: str, password_hash: str) -> dict:
+    from pymongo.errors import DuplicateKeyError
+    doc = {"name": name, "email": email, "password_hash": password_hash,
+           "created_at": datetime.datetime.now(datetime.timezone.utc)}
+    try:
+        result = await db.users.insert_one(doc)
+    except DuplicateKeyError as e:
+        raise EmailAlreadyRegistered(email) from e
+    doc["_id"] = result.inserted_id
+    return _public_user(doc)
+
+
+async def find_user_with_hash(email: str) -> tuple[dict, str] | None:
+    doc = await db.users.find_one({"email": email})
+    return (_public_user(doc), doc["password_hash"]) if doc else None
+
+
+async def find_user_by_id(user_id: str) -> dict | None:
+    from bson import ObjectId
+    from bson.errors import InvalidId
+    try:
+        doc = await db.users.find_one({"_id": ObjectId(user_id)})
+    except InvalidId:
+        return None
+    return _public_user(doc) if doc else None
+
+
+async def get_user_history(user_id: str, limit: int) -> list[dict]:
+    cursor = db.analyzed_messages.find(
+        {"user_id": user_id},
+        {"original_text_masked": 0, "metadata": 0, "user_id": 0},
+    ).sort("timestamp", -1).limit(limit)
+    items = []
+    async for doc in cursor:
+        doc["id"] = str(doc.pop("_id"))
+        doc["timestamp"] = doc["timestamp"].isoformat()
+        items.append(doc)
+    return items

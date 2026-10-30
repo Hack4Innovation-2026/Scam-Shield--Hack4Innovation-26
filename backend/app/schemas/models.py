@@ -70,3 +70,49 @@ class AnalysisResponse(BaseModel):
     signals: SignalScores
     ml_category: Optional[str] = None
     extracted_text: Optional[str] = None
+
+
+# ---------------------------------------------------------------- accounts
+_EMAIL_RE = r"^[^@\s]+@[^@\s]+\.[A-Za-z]{2,}$"
+
+
+class RegisterRequest(BaseModel):
+    name: str = Field(min_length=1, max_length=80)
+    email: str = Field(max_length=254, pattern=_EMAIL_RE)
+    # bcrypt uses at most 72 bytes of a password
+    password: str = Field(min_length=8, max_length=72)
+
+    @field_validator("name")
+    @classmethod
+    def strip_name(cls, v: str) -> str:
+        v = v.strip()
+        if not v:
+            raise ValueError("Name is required")
+        return v
+
+    @field_validator("email")
+    @classmethod
+    def normalise_email(cls, v: str) -> str:
+        return v.strip().lower()
+
+
+class LoginRequest(BaseModel):
+    email: str = Field(max_length=254)
+    password: str = Field(max_length=72)
+
+    @field_validator("email")
+    @classmethod
+    def normalise_email(cls, v: str) -> str:
+        return v.strip().lower()
+
+
+class UserOut(BaseModel):
+    id: str
+    name: str
+    email: str
+    created_at: str
+
+
+class AuthResponse(BaseModel):
+    token: str
+    user: UserOut

@@ -27,10 +27,12 @@ flowchart LR
         UI["Scan screen<br/>text · email · link · screenshot"]
         NB["Android notification bridge<br/>(ScamShield plugin)"]
         API["api/client.js"]
-        HS["History<br/>Firestore (signed in) / localStorage (guest)"]
+        AU["Login / Sign Up<br/>JWT in localStorage"]
+        HS["History<br/>server (signed in) / localStorage (guest)"]
         UI --> API
         NB --> API
         API --> HS
+        AU --> API
     end
 
     subgraph Backend["FastAPI backend"]
@@ -38,6 +40,7 @@ flowchart LR
         R2["POST /api/v1/analyze/email"]
         R3["POST /api/v1/analyze/url"]
         R4["POST /api/v1/analyze/image"]
+        R5["/api/v1/auth/*<br/>/api/v1/history"]
         OCR["Tesseract OCR"]
         P["unified_analyzer"]
         U["url_analyzer<br/>(+ sender domain)"]
@@ -51,8 +54,8 @@ flowchart LR
     end
 
     API -- "JSON / multipart" --> Backend
-    P -. "PII-masked log (optional)" .-> DB[(MongoDB)]
-    FB[(Firebase Auth + Firestore)] --- HS
+    P -. "PII-masked scans (+ user_id)" .-> DB[(MongoDB)]
+    R5 -. "users (bcrypt hashes), per-user history" .-> DB
 ```
 
 **Request flow.** The client posts the raw input. The backend extracts URLs, scores behaviour and runs the matching ML model on the **unmasked** text. The models never saw masked placeholders, so masking first would hurt accuracy. The risk scorer then combines whichever signals apply: a link-free SMS has no URL score, and a bare URL has no text-model score. If MongoDB is configured, a **PII-masked** copy is stored.
@@ -74,12 +77,11 @@ backend/            FastAPI service
   app/services/     url_analyzer, behavioral_engine, ml_engine, ocr, risk_scorer, ...
   app/schemas/      pydantic request/response models
   models/           pickled vectorizers + classifiers
-  tests/            pytest suite (59 tests)
+  tests/            pytest suite (74 tests)
   Dockerfile
 frontend/           React 19 + Vite + Capacitor app
   src/api/client.js backend client (the only place that talks to the API)
   src/screens/      UI screens
-  firestore.rules   per-user history rules
 ml/                 training + evaluation scripts
   evaluate.py       model evaluation and comparison
   results/          metrics.md, metrics.json, pr_curves.png
@@ -123,16 +125,11 @@ MongoDB is **optional**. It stores a PII-masked record of every analysis and pow
 ```bash
 cd frontend
 npm install
-cp .env.example .env.local        # optional: add Firebase web config
 npm run dev                       # http://localhost:5173
 ```
 In development, Vite proxies `/api` to `http://localhost:8000`, so no CORS setup is needed. For a production build or the Android app, set `VITE_API_URL`; the Android emulator reaches the host at `http://10.0.2.2:8000`.
 
-**Firebase is optional.** Without it the app runs in guest mode with history in `localStorage`. To enable accounts and cloud history:
-1. Create a **Web app** in Firebase Console → Project settings → Your apps.
-2. Copy its config into the `VITE_FIREBASE_*` variables.
-3. Enable the Email/Password and Google sign-in providers.
-4. Deploy `frontend/firestore.rules`.
+**Accounts** need MongoDB. Sign-up and login are handled by the backend: passwords are hashed with bcrypt, and sessions use signed JWT tokens. Set `JWT_SECRET` in `backend/.env`; `scripts/setup.ps1` generates one. Without a database the app runs in guest mode, with history kept in the browser.
 
 ### Docker
 ```bash
@@ -164,6 +161,12 @@ The free setup is Vercel (frontend), Render (API, via `render.yaml`) and MongoDB
 | POST | `/api/v1/analyze/url` | `{"url": "http://..."}` |
 | POST | `/api/v1/analyze/image` | multipart `file` (PNG/JPEG, ≤ 5 MB) |
 | GET | `/api/v1/stats?days=30` | aggregated scan statistics (requires MongoDB) |
+| POST | `/api/v1/auth/register` | `{"name", "email", "password"}` → `{"token", "user"}` |
+| POST | `/api/v1/auth/login` | `{"email", "password"}` → `{"token", "user"}` |
+| GET | `/api/v1/auth/me` | the signed-in user (`Authorization: Bearer <token>`) |
+| GET | `/api/v1/history` | the signed-in user's scans, newest first |
+
+Analyze requests that carry a valid `Authorization: Bearer <token>` header are saved to that user's history. Without the header, the scan is anonymous.
 | GET | `/` | health check (models and database status) |
 
 ```bash
@@ -221,6 +224,7 @@ curl -s localhost:8000/api/v1/analyze -H "Content-Type: application/json" \
 - **Three independent signals, not one model.** Rules catch what a small text model misses (a `.xyz` lure domain, "digital arrest"), and the model catches phrasing no rule lists. When two signals agree, a corroboration bonus is added.
 - **Missing signals are excluded, not zeroed.** A fixed 40 % URL weight capped link-free scams at 60, so they could never be flagged.
 - **Analyse raw text, store masked text.** Masking before inference breaks URLs and feeds the models tokens they never saw.
+- **Own authentication instead of a third-party SDK.** The same token works for the web app and the Android app. Passwords are bcrypt-hashed. Login errors don't reveal which emails are registered, and the user id comes only from the verified token, never from request data.
 - **No fabricated results.** If the backend is down, the app says so, and the OCR endpoint returns `503` when Tesseract is missing.
 
 ## Known limitations & roadmap

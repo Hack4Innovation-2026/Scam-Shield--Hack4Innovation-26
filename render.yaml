@@ -13,6 +13,8 @@ services:
         sync: false
       - key: CORS_ORIGINS       # e.g. https://scam-shield.vercel.app
         sync: false
+      - key: JWT_SECRET         # signs login tokens
+        generateValue: true
       - key: MONGO_DB
         value: scam_detection_db
       - key: WEB_CONCURRENCY

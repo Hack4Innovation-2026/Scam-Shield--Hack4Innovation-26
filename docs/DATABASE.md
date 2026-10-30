@@ -1,11 +1,13 @@
 # Data storage
 
-Scam Shield uses two databases, each for a different owner of the data.
+Scam Shield stores everything in **MongoDB**, written only by the backend:
 
-| Store | Holds | Written by | Required |
-|---|---|---|---|
-| **MongoDB** | every analysis the API performs, with PII masked | backend | No. The API runs without it. |
-| **Firebase Firestore** | each signed-in user's personal scan history | frontend | No. Guests use local storage. |
+| Collection | Holds |
+|---|---|
+| `analyzed_messages` | every analysis, PII-masked. Scans by signed-in users carry their `user_id`. |
+| `users` | accounts: name, email (unique), bcrypt password hash, creation date |
+
+MongoDB is optional. Without it, scanning works but accounts, history and stats are unavailable, and guests keep their history in the browser.
 
 ## What MongoDB is used for
 
@@ -32,11 +34,14 @@ That record serves three purposes:
 
 1. **Analytics.** `GET /api/v1/stats?days=30` aggregates it: totals by verdict, the most common scam types, and the input channels.
 2. **Retraining data.** Masked messages and their verdicts are the raw material for the next model version.
-3. **Audit trail.** It records which signals produced each verdict, so false positives can be investigated.
+3. **Per-user history.** `GET /api/v1/history` returns the signed-in user's scans, using the `{user_id: 1, timestamp: -1}` index.
+4. **Audit trail.** It records which signals produced each verdict, so false positives can be investigated.
 
 **Privacy.** OTPs, phone numbers, account numbers and email addresses are replaced with placeholders *before* storage. The sender's email address is not stored.
 
-**Indexes.** `{timestamp: -1}` and `{level: 1, timestamp: -1}` are created on startup to serve the stats queries.
+**Indexes** (created on startup): `{timestamp: -1}` and `{level: 1, timestamp: -1}` for stats, `{user_id: 1, timestamp: -1}` for history, and a unique index on `users.email`.
+
+**Passwords** are never stored. Only bcrypt hashes are, and API responses never include them.
 
 ## Why a document database here
 

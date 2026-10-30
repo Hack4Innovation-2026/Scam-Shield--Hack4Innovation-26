@@ -32,3 +32,12 @@ TESSERACT_CMD = _env("TESSERACT_CMD")
 MAX_UPLOAD_BYTES = int(_env("MAX_UPLOAD_BYTES", str(5 * 1024 * 1024)))
 
 LOG_LEVEL = _env("LOG_LEVEL", "INFO").upper()
+
+# Signing key for login tokens. Without one, a random key is generated per process: logins work
+# but every restart signs users out. Set a long random value in .env (setup.ps1 does this).
+JWT_SECRET = _env("JWT_SECRET")
+JWT_SECRET_IS_EPHEMERAL = not JWT_SECRET
+if JWT_SECRET_IS_EPHEMERAL:
+    import secrets
+    JWT_SECRET = secrets.token_urlsafe(48)
+JWT_EXPIRE_DAYS = int(_env("JWT_EXPIRE_DAYS", "7"))

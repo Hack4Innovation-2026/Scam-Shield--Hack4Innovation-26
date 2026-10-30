@@ -10,9 +10,10 @@ All notable changes to this project are documented here. The format follows [Kee
 - `GET /api/v1/stats`: scan statistics aggregated in MongoDB.
 - Sender-domain checks for emails.
 - Per-signal score breakdown (`signals`) and model category (`ml_category`) in every response.
-- 59 pytest tests across endpoints, engines, configuration and persistence.
+- 74 pytest tests across endpoints, engines, accounts, configuration and persistence.
 - Model evaluation (`ml/evaluate.py`): stratified hold-out plus 5-fold cross-validation, comparing Random Forest, Logistic Regression, Naive Bayes and Linear SVM.
-- Frontend API client, a link scan tab, and history persisted to Firestore (signed in) or local storage (guest).
+- Accounts: separate Log In and Sign Up screens, backend registration and login (bcrypt + JWT), and per-user scan history in MongoDB (`/api/v1/auth/*`, `/api/v1/history`). Guests keep history in local storage.
+- Frontend API client and a link scan tab.
 - Dockerfile, docker-compose (API + MongoDB), GitHub Actions CI and a Render blueprint.
 
 ### Fixed
@@ -31,6 +32,7 @@ All notable changes to this project are documented here. The format follows [Kee
 - `motor` was replaced with PyMongo's native async client.
 
 ### Removed
+- Firebase (Auth and Firestore), replaced by the backend's own accounts.
 - Simulated results: the random call-reputation tab, the offline fallback scores and the placeholder OCR text.
 - Build artefacts and IDE files from version control.
 

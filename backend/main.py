@@ -11,6 +11,8 @@ from app.routes.email_routes import router as email_router
 from app.routes.image_routes import router as image_router
 from app.routes.url_routes import router as url_router
 from app.routes.stats_routes import router as stats_router
+from app.routes.auth_routes import router as auth_router
+from app.routes.history_routes import router as history_router
 from app.database import connection
 from app.services import ml_engine
 
@@ -21,6 +23,8 @@ logging.basicConfig(level=config.LOG_LEVEL, format="%(asctime)s %(levelname)s %(
 async def lifespan(app: FastAPI):
     # Load models up front so a missing file fails at startup, not on the first request.
     ml_engine.load_models()
+    if config.JWT_SECRET_IS_EPHEMERAL:
+        logging.getLogger(__name__).warning("JWT_SECRET not set - using a temporary key; users are signed out on every restart")
     await connect_to_mongo()
     yield
     await close_mongo_connection()
@@ -38,7 +42,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=config.CORS_ORIGINS,
     allow_credentials=False,
-    allow_methods=["GET", "POST"],
+    allow_methods=["GET", "POST"],  # Authorization header allowed via allow_headers
     allow_headers=["*"],
 )
 
@@ -47,6 +51,8 @@ app.include_router(email_router)
 app.include_router(image_router)
 app.include_router(url_router)
 app.include_router(stats_router)
+app.include_router(auth_router)
+app.include_router(history_router)
 
 
 @app.get("/", tags=["Health"])

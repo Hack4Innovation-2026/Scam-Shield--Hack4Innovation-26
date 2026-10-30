@@ -7,7 +7,7 @@ from fastapi.testclient import TestClient
 
 from app import config
 from app.database import connection
-from conftest import DIGITAL_ARREST_SMS
+from conftest import DIGITAL_ARREST_SMS, requires_mongo
 
 
 def test_stats_unavailable_without_database(client, monkeypatch):
@@ -19,21 +19,6 @@ def test_stats_unavailable_without_database(client, monkeypatch):
 
 def test_health_reports_database_status(client):
     assert "database" in client.get("/").json()
-
-
-requires_mongo = pytest.mark.skipif(not os.getenv("TEST_MONGO_URI"), reason="TEST_MONGO_URI not set")
-
-
-@pytest.fixture
-def mongo_client(monkeypatch):
-    # Separate throwaway database per test run so real data is never touched.
-    monkeypatch.setattr(config, "MONGO_URI", os.environ["TEST_MONGO_URI"])
-    monkeypatch.setattr(config, "MONGO_DB", f"scam_shield_test_{uuid.uuid4().hex[:8]}")
-    import main
-    with TestClient(main.app) as c:
-        yield c
-    from pymongo import MongoClient
-    MongoClient(os.environ["TEST_MONGO_URI"]).drop_database(config.MONGO_DB)
 
 
 @requires_mongo

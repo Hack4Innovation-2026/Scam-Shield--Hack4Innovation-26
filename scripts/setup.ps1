@@ -50,7 +50,15 @@ if (-not (Test-Path $envFile)) {
     Copy-Item (Join-Path $backend ".env.example") $envFile
     Ok "Created backend\.env from .env.example (add MONGO_URI to enable the database)"
 } else {
-    Ok "backend\.env already exists - left unchanged"
+    Ok "backend\.env already exists - kept"
+}
+# A stable login-token key, so users stay signed in across restarts. Never overwrites an existing one.
+if (-not (Select-String -Path $envFile -Pattern '^JWT_SECRET=\S+' -Quiet)) {
+    $secret = & $venvPython -c "import secrets; print(secrets.token_urlsafe(48))"
+    $lines = Get-Content $envFile | Where-Object { $_ -notmatch '^JWT_SECRET=' }
+    # UTF-8 without BOM (PowerShell 5.1's -Encoding utf8 adds one, which breaks .env parsing)
+    [IO.File]::WriteAllLines($envFile, [string[]]($lines + "JWT_SECRET=$secret"), (New-Object Text.UTF8Encoding $false))
+    Ok "Generated JWT_SECRET in backend\.env"
 }
 
 # --- Frontend --------------------------------------------------------------------------------

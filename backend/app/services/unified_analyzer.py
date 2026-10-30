@@ -23,7 +23,7 @@ def _scam_type(risk_score: int, intent: str, urls: list, ml_category: str | None
     return "social_engineering"
 
 
-async def pipeline_analyze_input(text: str, source: str, metadata: dict) -> AnalysisResponse:
+async def pipeline_analyze_input(text: str, source: str, metadata: dict, user_id: str | None = None) -> AnalysisResponse:
     source = source.strip().lower() or "sms"
     is_bare_url = source == "url"
 
@@ -83,6 +83,8 @@ async def pipeline_analyze_input(text: str, source: str, metadata: dict) -> Anal
     log_data["timestamp"] = datetime.datetime.now(datetime.timezone.utc)
     log_data["metadata"] = {k: v for k, v in metadata.items() if k != "sender_email"}
     log_data["original_text_masked"] = process_and_mask_pii(text)
+    if user_id:
+        log_data["user_id"] = user_id   # from a verified token only, never from request metadata
     await store_analyzed_message(log_data)
 
     return response

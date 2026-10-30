@@ -80,7 +80,7 @@ async def pipeline_analyze_input(text: str, source: str, metadata: dict) -> Anal
 
     # 6. Store a PII-masked copy (no-op when MongoDB is not configured)
     log_data = response.model_dump()
-    log_data["timestamp"] = datetime.datetime.now(datetime.timezone.utc).isoformat()
+    log_data["timestamp"] = datetime.datetime.now(datetime.timezone.utc)
     log_data["metadata"] = {k: v for k, v in metadata.items() if k != "sender_email"}
     log_data["original_text_masked"] = process_and_mask_pii(text)
     await store_analyzed_message(log_data)

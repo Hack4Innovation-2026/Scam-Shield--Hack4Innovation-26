@@ -10,6 +10,8 @@ from app.routes.analysis_routes import router as analysis_router
 from app.routes.email_routes import router as email_router
 from app.routes.image_routes import router as image_router
 from app.routes.url_routes import router as url_router
+from app.routes.stats_routes import router as stats_router
+from app.database import connection
 from app.services import ml_engine
 
 logging.basicConfig(level=config.LOG_LEVEL, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -44,11 +46,12 @@ app.include_router(analysis_router)
 app.include_router(email_router)
 app.include_router(image_router)
 app.include_router(url_router)
+app.include_router(stats_router)
 
 
 @app.get("/", tags=["Health"])
 def health_check():
-    return {"status": "ok", "models_loaded": ml_engine.models_loaded()}
+    return {"status": "ok", "models_loaded": ml_engine.models_loaded(), "database": connection.is_connected()}
 
 
 if __name__ == "__main__":

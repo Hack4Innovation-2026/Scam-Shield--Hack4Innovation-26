@@ -1,5 +1,10 @@
 # Scam Shield
 
+[![CI](https://github.com/Hack4Innovation-2026/Scam-Shield--Hack4Innovation-26/actions/workflows/ci.yml/badge.svg)](https://github.com/Hack4Innovation-2026/Scam-Shield--Hack4Innovation-26/actions/workflows/ci.yml)
+![Python](https://img.shields.io/badge/python-3.12%2B-blue)
+![FastAPI](https://img.shields.io/badge/FastAPI-0.129-009688)
+![React](https://img.shields.io/badge/React-19-61dafb)
+
 Scam detection for the messages people actually get: SMS, WhatsApp/Telegram texts, emails, links and screenshots. A FastAPI backend combines three independent signals into one 0–100 risk score with a plain-language explanation and advice:
 
 - **URL heuristics:** shorteners, suspicious TLDs, raw IPs, punycode, lure-word domains.
@@ -9,6 +14,8 @@ Scam detection for the messages people actually get: SMS, WhatsApp/Telegram text
 A React (Vite + Capacitor) app is the client. It can be packaged for Android, where a native plugin feeds incoming notifications to the scanner.
 
 Built for Hack4Innovation 2026.
+
+**Documentation:** [Data storage & MongoDB](docs/DATABASE.md) · [Deployment](docs/DEPLOYMENT.md) · [Changelog](CHANGELOG.md)
 
 ---
 
@@ -67,7 +74,7 @@ backend/            FastAPI service
   app/services/     url_analyzer, behavioral_engine, ml_engine, ocr, risk_scorer, ...
   app/schemas/      pydantic request/response models
   models/           pickled vectorizers + classifiers
-  tests/            pytest suite (51 tests)
+  tests/            pytest suite (52 tests)
   Dockerfile
 frontend/           React 19 + Vite + Capacitor app
   src/api/client.js backend client (the only place that talks to the API)
@@ -76,7 +83,9 @@ frontend/           React 19 + Vite + Capacitor app
 ml/                 training + evaluation scripts
   evaluate.py       model evaluation and comparison
   results/          metrics.md, metrics.json, pr_curves.png
-docs/PROJECT_AUDIT.md   audit of the original code and the fix log
+docs/               database and deployment guides
+.github/workflows/  CI: tests, lint/build, Docker image
+render.yaml         Render deployment blueprint
 ```
 
 ---
@@ -99,7 +108,7 @@ Screenshot scanning needs the Tesseract binary. Without it the image endpoint re
 - macOS: `brew install tesseract`
 - Debian/Ubuntu: `apt install tesseract-ocr`
 
-MongoDB is **optional**. Leave `MONGO_URI` empty and nothing is persisted server-side.
+MongoDB is **optional**. It stores a PII-masked record of every analysis and powers `/api/v1/stats`. Leave `MONGO_URI` empty to run without it. Setup for Atlas, local install or Docker is in [docs/DATABASE.md](docs/DATABASE.md).
 
 ### Frontend
 ```bash
@@ -127,7 +136,13 @@ docker compose up --build
 ### Tests
 ```bash
 cd backend && pytest
+# include the live MongoDB tests:
+TEST_MONGO_URI=mongodb://localhost:27017 pytest
 ```
+CI runs the full suite, the frontend lint/build and a Docker build on every push and pull request.
+
+### Deployment
+The free setup is Vercel (frontend), Render (API, via `render.yaml`) and MongoDB Atlas. Step-by-step instructions are in [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
 
 ---
 
@@ -139,7 +154,8 @@ cd backend && pytest
 | POST | `/api/v1/analyze/email` | `{"subject": "...", "body": "...", "sender_email": "..."}` |
 | POST | `/api/v1/analyze/url` | `{"url": "http://..."}` |
 | POST | `/api/v1/analyze/image` | multipart `file` (PNG/JPEG, ≤ 5 MB) |
-| GET | `/` | health check |
+| GET | `/api/v1/stats?days=30` | aggregated scan statistics (requires MongoDB) |
+| GET | `/` | health check (models and database status) |
 
 ```bash
 curl -s localhost:8000/api/v1/analyze -H "Content-Type: application/json" \

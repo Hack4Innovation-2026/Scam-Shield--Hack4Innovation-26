@@ -1,48 +1,65 @@
-import React, { useEffect, useState } from 'react';
-import { Loader2, Search, Target, BrainCircuit, ShieldAlert } from 'lucide-react';
-import { analyzeInput } from '../utils/mockEngine';
+import React, { useEffect, useRef, useState } from 'react';
+import { Loader2, Search, Target, BrainCircuit, ShieldAlert, ScanText, WifiOff } from 'lucide-react';
+import { analyzeInput } from '../api/client';
 
-const steps = [
-  { id: 1, text: "Masking sensitive PII data...", icon: <ShieldAlert size={20} /> },
-  { id: 2, text: "Extracting URLs...", icon: <Search size={20} /> },
-  { id: 3, text: "Analyzing behavioral intent...", icon: <Target size={20} /> },
-  { id: 4, text: "Running AI risk models...", icon: <BrainCircuit size={20} /> }
+const textSteps = [
+  { id: 1, text: "Extracting URLs...", icon: <Search size={20} /> },
+  { id: 2, text: "Analyzing behavioral intent...", icon: <Target size={20} /> },
+  { id: 3, text: "Running AI risk models...", icon: <BrainCircuit size={20} /> },
+  { id: 4, text: "Combining risk signals...", icon: <ShieldAlert size={20} /> }
+];
+const imageSteps = [{ id: 0, text: "Reading text from screenshot (OCR)...", icon: <ScanText size={20} /> }, ...textSteps];
+const urlSteps = [
+  { id: 1, text: "Parsing domain...", icon: <Search size={20} /> },
+  { id: 2, text: "Checking shorteners, TLDs and IPs...", icon: <ShieldAlert size={20} /> }
 ];
 
+const STEP_MS = 450;
+
 const ProcessingScreen = ({ data, onComplete, onCancel }) => {
+  const steps = data?.type === 'image' ? imageSteps : data?.type === 'url' ? urlSteps : textSteps;
   const [currentStep, setCurrentStep] = useState(0);
+  const [error, setError] = useState(null);
+  const [attempt, setAttempt] = useState(0);
+  const onCompleteRef = useRef(onComplete);
+  useEffect(() => {
+    onCompleteRef.current = onComplete;
+  });
 
   useEffect(() => {
-    // Simulate backend processing pipeline
-    let stepTimer;
-    let finishTimer;
+    // The request runs immediately; the step list is a progress indicator that advances alongside it.
+    let cancelled = false;
+    const ticker = setInterval(() => setCurrentStep(s => Math.min(s + 1, steps.length - 1)), STEP_MS);
+    const minDisplay = new Promise(resolve => setTimeout(resolve, STEP_MS * steps.length));
 
-    const runSteps = async () => {
-      // Advance steps roughly every 600ms
-      for (let i = 0; i < steps.length; i++) {
-        setCurrentStep(i);
-        await new Promise(resolve => setTimeout(resolve, 600 + Math.random() * 400));
-      }
+    Promise.all([analyzeInput(data), minDisplay])
+      .then(([result]) => { if (!cancelled) onCompleteRef.current(result); })
+      .catch(err => { if (!cancelled) setError(err.message || 'Analysis failed.'); })
+      .finally(() => clearInterval(ticker));
 
-      // After all steps show briefly, run the engine
-      try {
-        const result = await analyzeInput(data);
-        onComplete(result);
-      } catch (err) {
-        console.error("Analysis Failed:", err);
-        // Fallback for demo stability
-        onComplete({ level: 'error', reason: 'Backend connection failed.' });
-      }
-    };
-
-    runSteps();
-
-    // Cleanup
     return () => {
-      clearTimeout(stepTimer);
-      clearTimeout(finishTimer);
+      cancelled = true;
+      clearInterval(ticker);
     };
-  }, [data, onComplete]);
+  }, [data, attempt, steps.length]);
+
+  const retry = () => {
+    setError(null);
+    setCurrentStep(0);
+    setAttempt(a => a + 1);
+  };
+
+  if (error) {
+    return (
+      <div className="screen" style={{ justifyContent: 'center', alignItems: 'center', gap: '1.5rem' }}>
+        <WifiOff size={64} className="text-scam" />
+        <h2 className="text-h2 text-center" style={{ margin: 0 }}>Scan failed</h2>
+        <p className="text-sub text-center" style={{ maxWidth: '22rem' }}>{error}</p>
+        <button className="btn btn-primary" onClick={retry}>Try again</button>
+        <button className="btn btn-secondary" onClick={onCancel}>Back to home</button>
+      </div>
+    );
+  }
 
   return (
     <div className="screen" style={{ justifyContent: 'center', alignItems: 'center' }}>
@@ -82,9 +99,6 @@ const ProcessingScreen = ({ data, onComplete, onCancel }) => {
           </div>
         ))}
       </div>
-
-      {/* TODO: Connect to backend API: 
-          axios.post('/api/v1/analyze', data).then(...) */}
 
       <button className="btn btn-secondary" style={{ marginTop: '2rem' }} onClick={onCancel}>
         Cancel Scan

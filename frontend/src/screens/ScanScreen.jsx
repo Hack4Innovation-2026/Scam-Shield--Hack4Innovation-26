@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { Type, Mail, Image as ImageIcon, Search, ArrowLeft, Phone } from 'lucide-react';
+import { Type, Mail, Image as ImageIcon, Search, ArrowLeft, Link as LinkIcon } from 'lucide-react';
 
 const ScanScreen = ({ onNavigate, onStartScan, initialData }) => {
-  const [activeTab, setActiveTab] = useState(initialData?.tab || 'text'); // text, email, image, call
+  const [activeTab, setActiveTab] = useState(initialData?.tab || 'text'); // text, email, url, image
   
   // States for different inputs
   const [textInput, setTextInput] = useState('');
@@ -15,7 +15,7 @@ const ScanScreen = ({ onNavigate, onStartScan, initialData }) => {
   const [imageFile, setImageFile] = useState(null);
   const [imagePreviewUrl, setImagePreviewUrl] = useState(null);
 
-  const [phoneNumber, setPhoneNumber] = useState('');
+  const [urlInput, setUrlInput] = useState('');
 
   const handleScan = () => {
     let payload = { type: activeTab };
@@ -33,13 +33,11 @@ const ScanScreen = ({ onNavigate, onStartScan, initialData }) => {
     } else if (activeTab === 'image') {
       if (!imageFile) return;
       payload.image = imageFile;
-      payload.source = 'Image (Extracted Text)';
-      // Simulate extracted text for the demo
-      payload.text = "Congratulations! You've won. Click here: bit.ly/prize";
-    } else if (activeTab === 'call') {
-      if (!phoneNumber) return;
-      payload.phoneNumber = phoneNumber;
-      payload.source = 'Phone Call';
+      payload.source = 'Screenshot';
+    } else if (activeTab === 'url') {
+      if (!urlInput.trim()) return;
+      payload.url = urlInput.trim();
+      payload.source = 'URL';
     }
 
     onStartScan(payload);
@@ -81,10 +79,10 @@ const ScanScreen = ({ onNavigate, onStartScan, initialData }) => {
         </button>
         <button 
           className="btn" 
-          style={{ padding: '0.5rem 1rem', flexShrink: 0, fontSize: '0.875rem', display: 'flex', alignItems: 'center', gap: '0.5rem', background: activeTab === 'call' ? 'var(--primary)' : 'transparent', color: activeTab === 'call' ? 'white' : 'var(--text-secondary)' }}
-          onClick={() => setActiveTab('call')}
+          style={{ padding: '0.5rem 1rem', flexShrink: 0, fontSize: '0.875rem', display: 'flex', alignItems: 'center', gap: '0.5rem', background: activeTab === 'url' ? 'var(--primary)' : 'transparent', color: activeTab === 'url' ? 'white' : 'var(--text-secondary)' }}
+          onClick={() => setActiveTab('url')}
         >
-          <Phone size={16} /> Call
+          <LinkIcon size={16} /> Link
         </button>
         <button 
           className="btn" 
@@ -144,21 +142,21 @@ const ScanScreen = ({ onNavigate, onStartScan, initialData }) => {
           </div>
         )}
 
-        {activeTab === 'call' && (
+        {activeTab === 'url' && (
           <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
              <div className="input-group">
-                <label className="input-label">Phone Number</label>
-                <input 
-                  type="text" 
-                  className="input-field" 
-                  placeholder="+1 (555) 000-0000" 
-                  value={phoneNumber} 
-                  onChange={e => setPhoneNumber(e.target.value)} 
+                <label className="input-label">Link</label>
+                <input
+                  type="url"
+                  className="input-field"
+                  placeholder="http://sbi-kyc-update.xyz/login"
+                  value={urlInput}
+                  onChange={e => setUrlInput(e.target.value)}
                 />
              </div>
              <div style={{ padding: '1rem', background: 'rgba(59, 130, 246, 0.1)', borderRadius: 'var(--radius-md)', marginTop: '1rem' }}>
                <p className="text-sub" style={{ fontSize: '0.875rem', lineHeight: '1.5' }}>
-                 Simulate checking a caller ID against global community reports and spam databases.
+                 Checks for link shorteners, suspicious TLDs, raw IP addresses, look-alike (punycode) and crafted domains. The link is never opened.
                </p>
              </div>
           </div>
@@ -193,7 +191,7 @@ const ScanScreen = ({ onNavigate, onStartScan, initialData }) => {
           disabled={
             (activeTab === 'text' && !textInput) || 
             (activeTab === 'email' && (!emailBody && !emailSubject)) || 
-            (activeTab === 'call' && !phoneNumber) ||
+            (activeTab === 'url' && !urlInput.trim()) ||
             (activeTab === 'image' && !imageFile)
           }
         >

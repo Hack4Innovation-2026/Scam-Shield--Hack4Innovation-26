@@ -7,7 +7,7 @@ const LoginScreen = ({ onLogin, isDarkMode, setIsDarkMode }) => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const { loginWithEmail, signupWithEmail } = useAuth();
+  const { loginWithEmail, signupWithEmail, loginWithGoogle, firebaseEnabled } = useAuth();
 
   const handleEmailAuth = async (e, isSignup = false) => {
     e.preventDefault();
@@ -42,6 +42,8 @@ const LoginScreen = ({ onLogin, isDarkMode, setIsDarkMode }) => {
         errorMessage = 'Invalid email or password. If you are new, please Sign Up.';
       } else if (err.code === 'auth/email-already-in-use') {
         errorMessage = 'Email already in use. Please login instead.';
+      } else if (err.code === 'auth/not-configured') {
+        errorMessage = err.message;
       }
       setError(errorMessage);
     } finally {
@@ -49,7 +51,18 @@ const LoginScreen = ({ onLogin, isDarkMode, setIsDarkMode }) => {
     }
   };
 
-
+  const handleGoogle = async () => {
+    try {
+      setError('');
+      setLoading(true);
+      await loginWithGoogle();
+      onLogin(false);
+    } catch (err) {
+      if (err.code !== 'auth/popup-closed-by-user') setError('Google sign-in failed. ' + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="screen" style={{ justifyContent: 'center' }}>
@@ -71,6 +84,12 @@ const LoginScreen = ({ onLogin, isDarkMode, setIsDarkMode }) => {
       <div className="glass-card" style={{ padding: '2rem' }}>
         <form onSubmit={(e) => handleEmailAuth(e, false)}>
           
+          {!firebaseEnabled && (
+            <div style={{ background: 'rgba(59, 130, 246, 0.1)', padding: '0.75rem', borderRadius: 'var(--radius-md)', marginBottom: '1rem', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+              Accounts are disabled because Firebase is not configured. Continue as guest; your scan history is saved on this device.
+            </div>
+          )}
+
           {error && (
             <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem', background: 'rgba(239, 68, 68, 0.1)', padding: '0.75rem', borderRadius: 'var(--radius-md)', marginBottom: '1rem', borderLeft: '3px solid var(--accent-scam)' }}>
               <AlertCircle size={16} className="text-scam" style={{ marginTop: '2px', flexShrink: 0 }} />
@@ -112,10 +131,14 @@ const LoginScreen = ({ onLogin, isDarkMode, setIsDarkMode }) => {
               </button>
             </div>
 
-
+            {firebaseEnabled && (
+              <button type="button" className="btn btn-secondary" onClick={handleGoogle} disabled={loading}>
+                Continue with Google
+              </button>
+            )}
 
             <button type="button" className="btn btn-secondary" onClick={() => onLogin(true)} style={{ background: 'transparent', border: 'none', marginTop: '1rem', color: 'var(--text-sub)', fontSize: '0.875rem' }}>
-              Bypass Auth for Demo (Guest)
+              <User size={16} /> Continue as Guest
             </button>
           </div>
         </form>

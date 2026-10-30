@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { User, Shield, Bell, Lock, LogOut, ChevronRight, Moon, Sun, X } from 'lucide-react';
 import ScamShield from '../utils/ScamShieldPlugin';
 
-const SettingsScreen = ({ privacyMode, setPrivacyMode, isDarkMode, setIsDarkMode, onNavigate, onLogout }) => {
+const SettingsScreen = ({ privacyMode, setPrivacyMode, isDarkMode, setIsDarkMode, onLogout }) => {
   const [popupData, setPopupData] = useState(null); // { title, message }
 
   const showPopup = (title, message) => {

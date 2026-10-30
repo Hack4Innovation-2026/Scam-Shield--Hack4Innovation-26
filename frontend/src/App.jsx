@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import PermissionScreen from './screens/PermissionScreen';
 import LoginScreen from './screens/LoginScreen';
 import WalkthroughScreen from './screens/WalkthroughScreen';
@@ -11,18 +11,20 @@ import HistoryScreen from './screens/HistoryScreen';
 import SettingsScreen from './screens/SettingsScreen';
 import NotificationSimulation from './components/NotificationSimulation';
 import { Home, Scan, Clock, Settings } from 'lucide-react';
-import { AuthProvider } from './context/AuthContext';
-import { db, auth } from './config/firebase';
-import { collection, addDoc } from 'firebase/firestore';
-import { analyzeInput } from './utils/mockEngine';
+import { useAuth } from './context/AuthContext';
+import { analyzeText } from './api/client';
+import { loadHistory, saveScan } from './utils/historyStore';
 import ScamShield from './utils/ScamShieldPlugin';
 function App() {
+  const { currentUser, logout } = useAuth();
   const [permissionsGranted, setPermissionsGranted] = useState(() => {
     return localStorage.getItem('scamShieldPermissions') === 'true';
   });
-  const [currentScreen, setCurrentScreen] = useState(permissionsGranted ? 'login' : 'permissions');
+  const [currentScreen, setCurrentScreen] = useState(() => {
+    if (!permissionsGranted) return 'permissions';
+    return currentUser ? 'home' : 'login';
+  });
   const [history, setHistory] = useState([]);
-  const [isFirstLogin, setIsFirstLogin] = useState(true);
   const [privacyMode, setPrivacyMode] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(false); // Light by default
   
@@ -33,6 +35,15 @@ function App() {
   // Simulation of background notification
   const [showNotification, setShowNotification] = useState(false);
   const [notificationData, setNotificationData] = useState(null);
+
+  // Load persisted history whenever the signed-in user changes (guest -> localStorage)
+  useEffect(() => {
+    let cancelled = false;
+    loadHistory(currentUser)
+      .then(items => { if (!cancelled) setHistory(items); })
+      .catch(err => console.error('Could not load scan history:', err));
+    return () => { cancelled = true; };
+  }, [currentUser]);
 
   // Apply theme class to document body
   useEffect(() => {
@@ -57,9 +68,15 @@ function App() {
              source: data.app || 'Native App',
              text: (data.title || '') + " " + data.text
            };
-           
-           const result = await analyzeInput(analysisPayload);
-           if (result.riskScore > 50) {
+
+           let result;
+           try {
+             result = await analyzeText(analysisPayload.text, 'notifications');
+           } catch (err) {
+             console.warn('Notification scan failed:', err.message);
+             return;
+           }
+           if (result.riskScore >= 70) {
               // Trigger Native Android Toast matching user request, including percentage!
               await ScamShield.showToast({ text: `⚠ Scam message detected! Risk: ${result.riskScore}%` });
               
@@ -99,8 +116,7 @@ function App() {
     setCurrentScreen(screen);
   };
 
-  const handleLogin = (guest = false) => {
-    setIsFirstLogin(false);
+  const handleLogin = () => {
     setCurrentScreen('home');
   };
 
@@ -108,22 +124,25 @@ function App() {
     navigateTo('processing', data);
   };
 
-  const handleScanComplete = async (result) => {
+  const handleScanComplete = useCallback(async (result) => {
     const scanRecord = { ...result, id: Date.now(), date: new Date().toISOString() };
-    
+
     // Update local state instantly
     setHistory(prev => [scanRecord, ...prev]);
 
-    // Save to persistent database if logged in
-    if (auth.currentUser) {
-      try {
-        await addDoc(collection(db, `users/${auth.currentUser.uid}/scans`), scanRecord);
-      } catch (err) {
-        console.error("Error saving to Firebase DB:", err);
-      }
+    try {
+      await saveScan(currentUser, scanRecord);
+    } catch (err) {
+      console.error("Error saving scan history:", err);
     }
 
-    navigateTo('result', scanRecord);
+    setScanResult(scanRecord);
+    setCurrentScreen('result');
+  }, [currentUser]);
+
+  const handleLogout = async () => {
+    await logout();
+    setCurrentScreen('login');
   };
 
   const handleNotificationClick = () => {
@@ -140,7 +159,6 @@ function App() {
   };
 
   return (
-    <AuthProvider>
       <div className={`app-container ${isDarkMode ? '' : 'theme-light'}`} style={{ position: 'relative' }}>
         
       {/* Screens */}
@@ -161,7 +179,7 @@ function App() {
       {currentScreen === 'result' && <ResultScreen result={scanResult} onNavigate={navigateTo} />}
       {currentScreen === 'report' && <ReportScreen result={scanResult} onNavigate={navigateTo} />}
       {currentScreen === 'history' && <HistoryScreen history={history} onNavigate={navigateTo} />}
-      {currentScreen === 'settings' && <SettingsScreen privacyMode={privacyMode} setPrivacyMode={setPrivacyMode} isDarkMode={isDarkMode} setIsDarkMode={setIsDarkMode} onNavigate={navigateTo} onLogout={() => setCurrentScreen('login')} />}
+      {currentScreen === 'settings' && <SettingsScreen privacyMode={privacyMode} setPrivacyMode={setPrivacyMode} isDarkMode={isDarkMode} setIsDarkMode={setIsDarkMode} onNavigate={navigateTo} onLogout={handleLogout} />}
 
       {/* Notification Overlay */}
       {showNotification && (
@@ -194,7 +212,6 @@ function App() {
         </div>
       )}
     </div>
-    </AuthProvider>
   );
 }
 

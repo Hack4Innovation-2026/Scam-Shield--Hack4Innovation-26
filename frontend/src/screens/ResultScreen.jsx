@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { ShieldAlert, AlertTriangle, ShieldCheck, Link as LinkIcon, AlertCircle, ArrowLeft, Zap, ScanFace, Users, BadgeCheck } from 'lucide-react';
+import { ShieldAlert, AlertTriangle, ShieldCheck, Link as LinkIcon, AlertCircle, ArrowLeft, BarChart3, ScanText } from 'lucide-react';
 
 const CircularProgress = ({ score, color }) => {
   const dashArray = 283;
@@ -35,7 +35,7 @@ const ResultScreen = ({ result, onNavigate }) => {
 
   useEffect(() => {
     // Animate score from 0 to actual
-    if (result && !result.isELA) {
+    if (result) {
       const timer = setTimeout(() => {
         setShowScore(result.riskScore);
       }, 100);
@@ -47,10 +47,13 @@ const ResultScreen = ({ result, onNavigate }) => {
 
   const isScam = result.level === 'scam';
   const isSuspicious = result.level === 'suspicious';
-  const isSMS = result.source === 'SMS';
-  const isCall = result.source === 'Phone Call';
-  const isELA = result.isELA;
-  
+  const signals = result.signals || {};
+  const signalRows = [
+    { key: 'url', label: 'Link analysis' },
+    { key: 'behavioral', label: 'Behavioural patterns' },
+    { key: 'ml', label: 'ML text model' },
+  ].filter(row => signals[row.key] !== null && signals[row.key] !== undefined);
+
   const color = isScam ? 'var(--accent-scam)' : (isSuspicious ? 'var(--accent-warning)' : 'var(--accent-safe)');
   const bgGlow = isScam ? 'var(--shadow-glow-scam)' : (isSuspicious ? 'var(--shadow-glow-warning)' : 'var(--shadow-glow-safe)');
   
@@ -69,91 +72,58 @@ const ResultScreen = ({ result, onNavigate }) => {
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: '1.5rem' }}>
         
         <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: '1.5rem', marginBottom: '1rem', width: '100%' }}>
-          {!isELA && (
-            <div style={{ boxShadow: bgGlow, borderRadius: '50%', background: 'var(--card-bg)' }}>
-              <CircularProgress score={showScore} color={color} />
-            </div>
-          )}
-          
-          {isELA && (
-            <div style={{ padding: '1.5rem', background: 'var(--card-bg)', border: `2px dashed ${color}`, borderRadius: 'var(--radius-lg)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.75rem', boxShadow: bgGlow, width: '100%' }}>
-              
-              {result.elaImageBase64 ? (
-                 <img 
-                    src={`data:image/png;base64,${result.elaImageBase64}`} 
-                    alt="ELA Map" 
-                    style={{ width: '100%', borderRadius: 'var(--radius-sm)', border: '1px solid var(--card-border)' }} 
-                 />
-              ) : (
-                 <ScanFace size={36} color={color} />
-              )}
-              
-              <h3 className="text-h3" style={{ margin: 0, color: color, fontSize: '0.9rem', textAlign: 'center' }}>Forensic ELA</h3>
-              <p className="text-sub text-center" style={{ fontSize: '0.65rem' }}>
-                Highlighted variance map of compression signatures. Glowing areas indicate potential manipulation.
-              </p>
-            </div>
-          )}
+          <div style={{ boxShadow: bgGlow, borderRadius: '50%', background: 'var(--card-bg)' }}>
+            <CircularProgress score={showScore} color={color} />
+          </div>
         </div>
         
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
           <Icon color={color} size={24} />
           <h1 className="text-h1" style={{ color: color, background: 'none', margin: 0, textTransform: 'capitalize' }}>
-            {isELA && isScam ? 'Manipulation Detected' : result.level}
+            {result.level}
           </h1>
         </div>
         
         <p className="text-sub">Confidence: <span style={{ color: 'var(--text-primary)' }}>{result.confidence}</span> • Type: <span style={{ color: 'var(--text-primary)' }}>{result.scamType}</span></p>
       </div>
 
-      {isSMS && (
-        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.75rem', padding: '0.75rem', background: 'rgba(59, 130, 246, 0.1)', border: '1px solid rgba(59, 130, 246, 0.2)', borderRadius: 'var(--radius-md)', marginBottom: '1rem' }}>
-          <Zap size={20} className="text-primary" style={{ flexShrink: 0, marginTop: '2px' }} />
-          <div>
-            <p style={{ fontWeight: 600, fontSize: '0.875rem', color: 'var(--text-primary)', margin: 0 }}>High Efficiency SMS Analysis</p>
-            <p className="text-sub" style={{ fontSize: '0.8rem', marginTop: '0.25rem' }}>This message was successfully verified against 1.2M+ known phishing patterns and behavioral heuristics in under 200ms.</p>
+      {signalRows.length > 0 && (
+        <div className="glass-card" style={{ marginBottom: '1rem' }}>
+          <h3 className="text-h3" style={{ fontSize: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <BarChart3 size={16} className="text-primary" /> Risk signals
+          </h3>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', marginTop: '0.75rem' }}>
+            {signalRows.map(row => (
+              <div key={row.key}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', marginBottom: '0.25rem' }}>
+                  <span className="text-sub">{row.label}{row.key === 'ml' && result.mlCategory ? ` (${result.mlCategory})` : ''}</span>
+                  <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{Math.round(signals[row.key])}</span>
+                </div>
+                <div style={{ height: '6px', background: 'var(--input-bg)', borderRadius: '3px', overflow: 'hidden' }}>
+                  <div style={{ width: `${Math.min(100, signals[row.key])}%`, height: '100%', background: color }} />
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       )}
 
-      {isCall && result.socialGraph && (
-        <div className="glass-card" style={{ marginBottom: '1rem', borderTop: '3px solid #3b82f6' }}>
+      {result.extractedText && (
+        <div className="glass-card" style={{ marginBottom: '1rem' }}>
           <h3 className="text-h3" style={{ fontSize: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <Users size={16} className="text-primary" /> Global Social Graph Sync
+            <ScanText size={16} className="text-primary" /> Text read from screenshot
           </h3>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginTop: '1rem' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span className="text-sub" style={{ fontSize: '0.875rem' }}>Verified Caller ID</span>
-              <span style={{ fontSize: '0.875rem', color: 'var(--text-primary)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                {result.socialGraph.verifiedName} 
-                {!isScam && <BadgeCheck size={14} className="text-primary" />}
-              </span>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span className="text-sub" style={{ fontSize: '0.875rem' }}>Location</span>
-              <span style={{ fontSize: '0.875rem', color: 'var(--text-primary)' }}>{result.socialGraph.location}</span>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span className="text-sub" style={{ fontSize: '0.875rem' }}>Network Provider</span>
-              <span style={{ fontSize: '0.875rem', color: 'var(--text-primary)' }}>{result.socialGraph.carrier}</span>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.5rem', background: 'var(--input-bg)', borderRadius: 'var(--radius-sm)' }}>
-              <span className="text-sub" style={{ fontSize: '0.875rem' }}>Community Spam Reports</span>
-              <span className={result.socialGraph.spamReports > 10 ? 'text-scam' : 'text-safe'} style={{ fontSize: '0.875rem', fontWeight: 600 }}>
-                {result.socialGraph.spamReports} Reports
-              </span>
-            </div>
-          </div>
+          <p className="text-sub" style={{ fontSize: '0.8rem', lineHeight: '1.5', marginTop: '0.5rem', wordBreak: 'break-word' }}>{result.extractedText}</p>
         </div>
       )}
 
       <div className="glass-card" style={{ marginBottom: '1rem' }}>
         <h3 className="text-h3" style={{ fontSize: '1rem' }}>Analysis Details</h3>
         <p className="text-sub" style={{ marginBottom: '0.5rem', lineHeight: '1.5' }}>
-          {isELA ? result.elaMessage : result.reason}
+          {result.reason}
         </p>
         
-        {!isELA && result.intent !== 'Neutral' && (
+        {result.intent && result.intent.toLowerCase() !== 'neutral' && (
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '1rem', padding: '0.5rem', background: 'var(--input-bg)', borderRadius: 'var(--radius-sm)' }}>
             <Target size={16} className="text-warning" />
              <span style={{ fontSize: '0.875rem', color: 'var(--text-primary)' }}>Intent: {result.intent}</span>
@@ -191,8 +161,8 @@ const ResultScreen = ({ result, onNavigate }) => {
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', paddingBottom: '2rem' }}>
         
         {isScam && (
-          <button className="btn btn-danger" onClick={() => alert("Sender Blocked (Simulated)")}>
-            Block {isCall ? 'Number' : (isELA ? 'Source' : 'Sender')}
+          <button className="btn btn-danger" onClick={() => alert("Block the sender from your messaging app's contact options.")}>
+            Block Sender
           </button>
         )}
         

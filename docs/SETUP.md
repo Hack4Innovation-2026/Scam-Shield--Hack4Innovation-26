@@ -44,7 +44,7 @@ powershell -ExecutionPolicy Bypass -File scripts\setup.ps1
 The script:
 - checks Python, Node and Tesseract
 - creates `backend\.venv` and installs the Python packages
-- creates `backend\.env` from the example file
+- creates `backend\.env` from the example file, with a generated `JWT_SECRET` for login tokens
 - installs the frontend packages
 - confirms the ML models load
 
@@ -77,7 +77,7 @@ Two windows open, one for the backend and one for the frontend, and the app open
 | API docs | http://localhost:8000/docs |
 | Health check | http://localhost:8000/ (shows `"database": true` when MongoDB is connected) |
 
-On the login screen, choose **Continue as Guest**. Accounts need Firebase, which is optional; see `frontend\.env.example`.
+On the login screen, use **Sign Up** to create an account (needs the database from step 4), or **Continue as Guest**. Accounts work on both machines because they live in MongoDB.
 
 **To stop the app**, close both windows or press `Ctrl+C` in each.
 

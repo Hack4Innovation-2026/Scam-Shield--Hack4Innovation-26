@@ -1,79 +1,103 @@
 import React, { useState } from 'react';
-import { ShieldAlert, LogIn, User, Moon, Sun, AlertCircle } from 'lucide-react';
+import { ShieldAlert, LogIn, UserPlus, User, Moon, Sun, AlertCircle } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+const MIN_PASSWORD = 8;
+
+const Field = ({ label, type = 'text', value, onChange, placeholder, autoComplete, invalid }) => (
+  <div className="input-group">
+    <label className="input-label">{label}</label>
+    <input
+      type={type}
+      className="input-field"
+      placeholder={placeholder}
+      value={value}
+      autoComplete={autoComplete}
+      onChange={(e) => onChange(e.target.value)}
+      style={{ borderColor: invalid ? 'var(--accent-scam)' : 'var(--card-border)' }}
+    />
+  </div>
+);
+
 const LoginScreen = ({ onLogin, isDarkMode, setIsDarkMode }) => {
+  const [mode, setMode] = useState('login'); // 'login' | 'signup'
+  const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirm, setConfirm] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const { loginWithEmail, signupWithEmail, loginWithGoogle, firebaseEnabled } = useAuth();
+  const { loginWithEmail, signupWithEmail } = useAuth();
 
-  const handleEmailAuth = async (e, isSignup = false) => {
+  const isSignup = mode === 'signup';
+
+  const switchMode = (next) => {
+    setMode(next);
+    setError('');
+    setPassword('');
+    setConfirm('');
+  };
+
+  const validate = () => {
+    if (isSignup && !name.trim()) return 'Please enter your name.';
+    if (!EMAIL_RE.test(email.trim())) return 'Please enter a valid email address (e.g. user@example.com).';
+    if (!password) return 'Please enter your password.';
+    if (isSignup && password.length < MIN_PASSWORD) return `Password must be at least ${MIN_PASSWORD} characters.`;
+    if (isSignup && password !== confirm) return 'Passwords do not match.';
+    return '';
+  };
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!email || !password) {
-      setError('Both Email and Password are required.');
+    const problem = validate();
+    if (problem) {
+      setError(problem);
       return;
     }
-    
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      setError('Please enter a valid email address (e.g., user@example.com).');
-      return;
-    }
-    
-    if (password.length < 6) {
-      setError('Password must be at least 6 characters long.');
-      return;
-    }
-
     try {
       setError('');
       setLoading(true);
       if (isSignup) {
-        await signupWithEmail(email, password);
+        await signupWithEmail(name.trim(), email.trim(), password);
       } else {
-        await loginWithEmail(email, password);
+        await loginWithEmail(email.trim(), password);
       }
       onLogin(false);
     } catch (err) {
-      let errorMessage = 'Failed to authenticate. ' + err.message;
-      if (err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential') {
-        errorMessage = 'Invalid email or password. If you are new, please Sign Up.';
-      } else if (err.code === 'auth/email-already-in-use') {
-        errorMessage = 'Email already in use. Please login instead.';
-      } else if (err.code === 'auth/not-configured') {
-        errorMessage = err.message;
-      }
-      setError(errorMessage);
+      setError(err.message || 'Something went wrong. Please try again.');
+      if (err.status === 409) switchToLoginKeepingEmail();
     } finally {
       setLoading(false);
     }
   };
 
-  const handleGoogle = async () => {
-    try {
-      setError('');
-      setLoading(true);
-      await loginWithGoogle();
-      onLogin(false);
-    } catch (err) {
-      if (err.code !== 'auth/popup-closed-by-user') setError('Google sign-in failed. ' + err.message);
-    } finally {
-      setLoading(false);
-    }
+  // "Email already registered" on sign-up: move to Log In with the email filled in.
+  const switchToLoginKeepingEmail = () => {
+    setMode('login');
+    setPassword('');
+    setConfirm('');
   };
+
+  const tabStyle = (active) => ({
+    flex: 1, padding: '0.6rem', border: 'none', borderRadius: 'var(--radius-md)', cursor: 'pointer',
+    fontWeight: 600, fontSize: '0.9rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem',
+    background: active ? 'var(--primary)' : 'transparent',
+    color: active ? 'white' : 'var(--text-secondary)',
+    transition: 'all var(--transition-normal)',
+  });
 
   return (
     <div className="screen" style={{ justifyContent: 'center' }}>
-      <button 
+      <button
         style={{ position: 'absolute', top: '1rem', right: '1rem', background: 'transparent', border: 'none', color: 'var(--text-primary)', cursor: 'pointer', padding: '0.5rem' }}
         onClick={() => setIsDarkMode(!isDarkMode)}
+        aria-label={isDarkMode ? 'Switch to light theme' : 'Switch to dark theme'}
       >
         {isDarkMode ? <Sun size={24} /> : <Moon size={24} />}
       </button>
 
-      <div className="text-center" style={{ marginBottom: '2rem' }}>
+      <div className="text-center" style={{ marginBottom: '1.5rem' }}>
         <div style={{ display: 'inline-flex', padding: '1rem', background: 'rgba(59, 130, 246, 0.1)', borderRadius: '50%', marginBottom: '1rem' }}>
           <ShieldAlert size={48} color="#3b82f6" />
         </div>
@@ -81,67 +105,61 @@ const LoginScreen = ({ onLogin, isDarkMode, setIsDarkMode }) => {
         <p className="text-sub">AI-powered scam detection for your peace of mind</p>
       </div>
 
-      <div className="glass-card" style={{ padding: '2rem' }}>
-        <form onSubmit={(e) => handleEmailAuth(e, false)}>
-          
-          {!firebaseEnabled && (
-            <div style={{ background: 'rgba(59, 130, 246, 0.1)', padding: '0.75rem', borderRadius: 'var(--radius-md)', marginBottom: '1rem', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-              Accounts are disabled because Firebase is not configured. Continue as guest; your scan history is saved on this device.
-            </div>
-          )}
+      <div className="glass-card" style={{ padding: '1.5rem' }}>
+        <div role="tablist" style={{ display: 'flex', gap: '0.25rem', padding: '0.25rem', background: 'var(--input-bg)', borderRadius: 'var(--radius-md)', marginBottom: '1.25rem' }}>
+          <button type="button" role="tab" aria-selected={!isSignup} style={tabStyle(!isSignup)} onClick={() => switchMode('login')}>
+            <LogIn size={16} /> Log In
+          </button>
+          <button type="button" role="tab" aria-selected={isSignup} style={tabStyle(isSignup)} onClick={() => switchMode('signup')}>
+            <UserPlus size={16} /> Sign Up
+          </button>
+        </div>
 
+        <form onSubmit={handleSubmit} noValidate>
           {error && (
-            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem', background: 'rgba(239, 68, 68, 0.1)', padding: '0.75rem', borderRadius: 'var(--radius-md)', marginBottom: '1rem', borderLeft: '3px solid var(--accent-scam)' }}>
+            <div role="alert" style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem', background: 'rgba(239, 68, 68, 0.1)', padding: '0.75rem', borderRadius: 'var(--radius-md)', marginBottom: '1rem', borderLeft: '3px solid var(--accent-scam)' }}>
               <AlertCircle size={16} className="text-scam" style={{ marginTop: '2px', flexShrink: 0 }} />
               <p style={{ margin: 0, fontSize: '0.875rem', color: 'var(--accent-scam)' }}>{error}</p>
             </div>
           )}
 
-          <div className="input-group">
-            <label className="input-label">Email Address</label>
-            <input 
-              type="email" 
-              className="input-field" 
-              placeholder="user@example.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              style={{ borderColor: error ? 'var(--accent-scam)' : 'var(--card-border)' }}
-            />
-          </div>
-          
-          <div className="input-group">
-            <label className="input-label">Password *</label>
-            <input 
-              type="password" 
-              className="input-field" 
-              placeholder="••••••••"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              style={{ borderColor: error ? 'var(--accent-scam)' : 'var(--card-border)' }}
-            />
-          </div>
+          {isSignup && (
+            <Field label="Name" value={name} onChange={setName} placeholder="Your name" autoComplete="name" />
+          )}
+          <Field label="Email address" type="email" value={email} onChange={setEmail} placeholder="user@example.com" autoComplete="email" />
+          <Field
+            label="Password"
+            type="password"
+            value={password}
+            onChange={setPassword}
+            placeholder={isSignup ? `At least ${MIN_PASSWORD} characters` : '••••••••'}
+            autoComplete={isSignup ? 'new-password' : 'current-password'}
+          />
+          {isSignup && (
+            <Field label="Confirm password" type="password" value={confirm} onChange={setConfirm} placeholder="Repeat your password" autoComplete="new-password"
+              invalid={confirm.length > 0 && confirm !== password} />
+          )}
 
-          <div style={{ marginTop: '2rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            <div style={{ display: 'flex', gap: '0.5rem' }}>
-              <button type="submit" className="btn btn-primary" style={{ flex: 1 }} disabled={loading}>
-                <LogIn size={20} /> Login
-              </button>
-              <button type="button" className="btn btn-secondary" style={{ flex: 1 }} onClick={(e) => handleEmailAuth(e, true)} disabled={loading}>
-                Sign Up
-              </button>
-            </div>
+          <button type="submit" className="btn btn-primary" style={{ width: '100%', marginTop: '1rem' }} disabled={loading}>
+            {isSignup ? <UserPlus size={20} /> : <LogIn size={20} />}
+            {loading ? 'Please wait…' : isSignup ? 'Create account' : 'Log in'}
+          </button>
 
-            {firebaseEnabled && (
-              <button type="button" className="btn btn-secondary" onClick={handleGoogle} disabled={loading}>
-                Continue with Google
-              </button>
-            )}
-
-            <button type="button" className="btn btn-secondary" onClick={() => onLogin(true)} style={{ background: 'transparent', border: 'none', marginTop: '1rem', color: 'var(--text-sub)', fontSize: '0.875rem' }}>
-              <User size={16} /> Continue as Guest
+          <p className="text-sub text-center" style={{ fontSize: '0.8rem', marginTop: '1rem' }}>
+            {isSignup ? 'Already have an account? ' : 'New to Scam Shield? '}
+            <button type="button" onClick={() => switchMode(isSignup ? 'login' : 'signup')}
+              style={{ background: 'none', border: 'none', color: 'var(--primary)', cursor: 'pointer', fontWeight: 600, padding: 0 }}>
+              {isSignup ? 'Log in' : 'Create an account'}
             </button>
-          </div>
+          </p>
         </form>
+
+        <button type="button" className="btn btn-secondary" onClick={() => onLogin(true)} style={{ background: 'transparent', border: 'none', marginTop: '0.5rem', color: 'var(--text-secondary)', fontSize: '0.875rem', width: '100%' }}>
+          <User size={16} /> Continue as Guest
+        </button>
+        <p className="text-sub text-center" style={{ fontSize: '0.7rem', margin: 0 }}>
+          Guest history is kept on this device only.
+        </p>
       </div>
     </div>
   );

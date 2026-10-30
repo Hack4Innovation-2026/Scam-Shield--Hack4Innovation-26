@@ -1,13 +1,5 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import {
-  createUserWithEmailAndPassword,
-  signInWithEmailAndPassword,
-  signInWithPopup,
-  signOut,
-  onAuthStateChanged,
-  updateProfile,
-} from 'firebase/auth';
-import { auth, googleProvider, firebaseEnabled } from '../config/firebase';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import * as api from '../api/client';
 
 const AuthContext = createContext();
 
@@ -16,52 +8,44 @@ export const useAuth = () => {
   return useContext(AuthContext);
 };
 
-const notConfigured = () => {
-  const err = new Error('Accounts are unavailable: Firebase is not configured. Continue as guest.');
-  err.code = 'auth/not-configured';
-  throw err;
-};
-
 export const AuthProvider = ({ children }) => {
   const [currentUser, setCurrentUser] = useState(null);
-  const [loading, setLoading] = useState(firebaseEnabled);
+  const [loading, setLoading] = useState(() => Boolean(api.getToken()));
 
-  useEffect(() => {
-    if (!firebaseEnabled) return undefined;
-    return onAuthStateChanged(auth, (user) => {
-      setCurrentUser(user);
-      setLoading(false);
-    });
+  const logout = useCallback(() => {
+    api.setToken(null);
+    setCurrentUser(null);
   }, []);
 
-  const signupWithEmail = async (email, password, displayName) => {
-    if (!firebaseEnabled) notConfigured();
-    const cred = await createUserWithEmailAndPassword(auth, email, password);
-    await updateProfile(cred.user, { displayName: displayName || email.split('@')[0] });
-    return cred;
+  // Restore the session from a stored token.
+  useEffect(() => {
+    if (!api.getToken()) return;
+    api.fetchMe()
+      .then(setCurrentUser)
+      .catch(() => api.setToken(null))   // expired, revoked, or server unreachable: start signed out
+      .finally(() => setLoading(false));
+  }, []);
+
+  // The server rejected the token mid-session (expired): sign out.
+  useEffect(() => {
+    window.addEventListener(api.UNAUTHORIZED_EVENT, logout);
+    return () => window.removeEventListener(api.UNAUTHORIZED_EVENT, logout);
+  }, [logout]);
+
+  const startSession = ({ token, user }) => {
+    api.setToken(token);
+    setCurrentUser(user);
+    return user;
   };
 
-  const loginWithEmail = async (email, password) => {
-    if (!firebaseEnabled) notConfigured();
-    return signInWithEmailAndPassword(auth, email, password);
-  };
+  const signupWithEmail = async (name, email, password) => startSession(await api.register(name, email, password));
 
-  const loginWithGoogle = async () => {
-    if (!firebaseEnabled) notConfigured();
-    return signInWithPopup(auth, googleProvider);
-  };
-
-  const logout = async () => {
-    if (firebaseEnabled) await signOut(auth);
-    setCurrentUser(null);
-  };
+  const loginWithEmail = async (email, password) => startSession(await api.login(email, password));
 
   const value = {
     currentUser,
-    firebaseEnabled,
     signupWithEmail,
     loginWithEmail,
-    loginWithGoogle,
     logout
   };
 

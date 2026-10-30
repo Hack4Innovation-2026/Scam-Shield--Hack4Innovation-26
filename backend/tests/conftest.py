@@ -30,3 +30,19 @@ LOTTERY_SMS = "Congratulations! You have won Rs 50,000 lottery. Claim now at htt
 KYC_SMS = "Your SBI account will be blocked today. Update KYC immediately: http://sbi-kyc-update.xyz"
 BENIGN_SMS = "Hey, are we still meeting for lunch at 1pm tomorrow?"
 BENIGN_SMS_2 = "Mom I reached home, will call you later"
+
+
+requires_mongo = pytest.mark.skipif(not os.getenv("TEST_MONGO_URI"), reason="TEST_MONGO_URI not set")
+
+
+@pytest.fixture
+def mongo_client(monkeypatch):
+    """App connected to a throwaway database (dropped afterwards), so real data is never touched."""
+    import uuid
+    from app import config
+    monkeypatch.setattr(config, "MONGO_URI", os.environ["TEST_MONGO_URI"])
+    monkeypatch.setattr(config, "MONGO_DB", f"scam_shield_test_{uuid.uuid4().hex[:8]}")
+    with TestClient(main.app) as c:
+        yield c
+    from pymongo import MongoClient
+    MongoClient(os.environ["TEST_MONGO_URI"]).drop_database(config.MONGO_DB)

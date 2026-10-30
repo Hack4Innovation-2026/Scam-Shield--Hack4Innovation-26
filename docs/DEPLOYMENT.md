@@ -4,8 +4,6 @@ The recommended free setup:
 
 ```
 Browser ──► Vercel (React static build) ──► Render (FastAPI, Docker) ──► MongoDB Atlas
-                    │
-                    └──► Firebase Auth / Firestore (optional)
 ```
 
 | Component | Host | Plan |
@@ -26,6 +24,7 @@ Create the cluster, database user and network rule as described in [DATABASE.md]
 2. **New → Blueprint** → select this repository. Render reads `render.yaml` and creates the `scam-shield-api` service from `backend/Dockerfile`. The image includes Tesseract, so screenshot scanning works.
 3. When prompted, set:
    - `MONGO_URI`: the Atlas connection string
+   - `JWT_SECRET`: a long random string, used to sign login tokens. Generate one with `python -c "import secrets; print(secrets.token_urlsafe(48))"`.
    - `CORS_ORIGINS`: the frontend URL from step 3, e.g. `https://scam-shield.vercel.app`. Set a placeholder for now and update it after step 3.
 4. Deploy. Check `https://<service>.onrender.com/` (should show `"database": true`) and `/docs`.
 
@@ -37,9 +36,7 @@ Create the cluster, database user and network rule as described in [DATABASE.md]
    - **Framework preset:** Vite (build `npm run build`, output `dist`)
    - **Environment variables:**
      - `VITE_API_URL` = `https://<service>.onrender.com`
-     - `VITE_FIREBASE_*`: optional, see `frontend/.env.example`
 3. Deploy, then copy the production URL back into Render's `CORS_ORIGINS` and redeploy the backend.
-4. If Firebase is used, add the Vercel domain under Firebase Console → Authentication → Settings → **Authorized domains**.
 
 `VITE_*` variables are compiled into the bundle at build time. After changing them, redeploy the frontend.
 

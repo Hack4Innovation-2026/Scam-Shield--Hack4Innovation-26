@@ -6,6 +6,22 @@
 
 const API_URL = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '');
 const TIMEOUT_MS = 20000;
+const TOKEN_KEY = 'scamShieldToken';
+
+// Login token, sent as a Bearer header so scans are saved to the signed-in user's history.
+export const getToken = () => {
+  try { return localStorage.getItem(TOKEN_KEY); } catch { return null; }
+};
+export const setToken = (token) => {
+  try {
+    if (token) localStorage.setItem(TOKEN_KEY, token);
+    else localStorage.removeItem(TOKEN_KEY);
+  } catch {
+    // storage blocked: the session just won't survive a reload
+  }
+};
+// Fired when the server rejects the stored token, so the app can sign the user out.
+export const UNAUTHORIZED_EVENT = 'scamshield:unauthorized';
 
 export class ApiError extends Error {
   constructor(message, status) {
@@ -17,6 +33,12 @@ export class ApiError extends Error {
 
 const capitalize = (s) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s);
 const humanize = (s) => (s ? s.split('_').map(capitalize).join(' ') : s);
+
+const SOURCE_LABELS = {
+  sms: 'SMS', url: 'URL', email: 'Email', image: 'Screenshot', whatsapp: 'WhatsApp',
+  instagram: 'Instagram', telegram: 'Telegram', notifications: 'Notification',
+};
+const sourceLabel = (s) => SOURCE_LABELS[s] || capitalize(s);
 
 // Backend snake_case response -> the camelCase shape the screens render.
 const toResult = (data, displaySource) => ({
@@ -30,7 +52,7 @@ const toResult = (data, displaySource) => ({
   action: data.action,
   urls: data.urls || [],
   urlFlags: data.url_flags || [],
-  source: displaySource || capitalize(data.source),
+  source: displaySource || sourceLabel(data.source),
   signals: data.signals || {},
   mlCategory: data.ml_category ? humanize(data.ml_category) : null,
   extractedText: data.extracted_text || null,
@@ -41,12 +63,14 @@ const toResult = (data, displaySource) => ({
   },
 });
 
-async function request(path, options) {
+async function request(path, options = {}) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  const token = getToken();
+  const headers = { ...(options.headers || {}), ...(token ? { Authorization: `Bearer ${token}` } : {}) };
   let response;
   try {
-    response = await fetch(`${API_URL}${path}`, { ...options, signal: controller.signal });
+    response = await fetch(`${API_URL}${path}`, { ...options, headers, signal: controller.signal });
   } catch (err) {
     const reason = err.name === 'AbortError' ? 'timed out' : 'is unreachable';
     throw new ApiError(`The Scam Shield server ${reason}. Make sure the backend is running.`, 0);
@@ -65,7 +89,12 @@ async function request(path, options) {
     if (!body && [502, 504].includes(response.status)) {
       throw new ApiError('The Scam Shield server is unreachable. Make sure the backend is running.', 0);
     }
-    const detail = Array.isArray(body?.detail) ? body.detail.map(d => d.msg).join('; ') : body?.detail;
+    if (response.status === 401 && token) {
+      window.dispatchEvent(new Event(UNAUTHORIZED_EVENT));
+    }
+    const detail = Array.isArray(body?.detail)
+      ? body.detail.map(d => `${d.loc?.at(-1) ?? 'field'}: ${d.msg}`).join('; ')
+      : body?.detail;
     throw new ApiError(detail || `Request failed (${response.status})`, response.status);
   }
   return body;
@@ -97,4 +126,15 @@ export const analyzeInput = (payload) => {
     case 'image': return analyzeImage(payload.image);
     default: return analyzeText(payload.text, payload.source || 'SMS');
   }
+};
+
+// ---------------------------------------------------------------- accounts
+export const register = (name, email, password) => postJson('/api/v1/auth/register', { name, email, password });
+export const login = (email, password) => postJson('/api/v1/auth/login', { email, password });
+export const fetchMe = () => request('/api/v1/auth/me');
+
+// Server-side history for the signed-in user, in the same shape as a fresh scan result.
+export const fetchHistory = async () => {
+  const items = await request('/api/v1/history');
+  return items.map(item => ({ ...toResult(item), id: item.id, date: item.timestamp }));
 };

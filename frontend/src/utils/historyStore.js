@@ -1,6 +1,6 @@
-// Scan history persistence: Firestore (users/{uid}/scans) when signed in, localStorage for guests.
-import { collection, addDoc, getDocs, query, orderBy, limit } from 'firebase/firestore';
-import { db } from '../config/firebase';
+// Scan history: on the server for signed-in users (scans are saved automatically when the request
+// carries their token), in localStorage for guests.
+import { fetchHistory } from '../api/client';
 
 const LOCAL_KEY = 'scamShieldHistory';
 const MAX_ITEMS = 100;
@@ -21,19 +21,9 @@ const writeLocal = (items) => {
   }
 };
 
-export const loadHistory = async (user) => {
-  if (user && db) {
-    const q = query(collection(db, `users/${user.uid}/scans`), orderBy('date', 'desc'), limit(MAX_ITEMS));
-    const snap = await getDocs(q);
-    return snap.docs.map(d => d.data());
-  }
-  return readLocal();
-};
+export const loadHistory = (user) => (user ? fetchHistory() : Promise.resolve(readLocal()));
 
 export const saveScan = async (user, record) => {
-  if (user && db) {
-    await addDoc(collection(db, `users/${user.uid}/scans`), record);
-    return;
-  }
+  if (user) return;   // already stored by the backend with the scan
   writeLocal([record, ...readLocal()]);
 };

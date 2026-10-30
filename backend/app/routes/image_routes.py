@@ -1,12 +1,13 @@
 import logging
 
-from fastapi import APIRouter, UploadFile, File, HTTPException
+from fastapi import APIRouter, Depends, UploadFile, File, HTTPException
 from fastapi.concurrency import run_in_threadpool
 
 from app import config
 from app.schemas.models import AnalysisResponse
 from app.services import ocr
 from app.services.unified_analyzer import pipeline_analyze_input
+from app.dependencies import get_optional_user
 
 logger = logging.getLogger(__name__)
 
@@ -15,7 +16,7 @@ router = APIRouter(prefix="/api/v1/analyze/image", tags=["Image Analysis"])
 
 @router.post("", response_model=AnalysisResponse)
 @router.post("/", response_model=AnalysisResponse, include_in_schema=False)
-async def analyze_image(file: UploadFile = File(...)):
+async def analyze_image(file: UploadFile = File(...), user: dict | None = Depends(get_optional_user)):
     """
     Extracts text from a screenshot with Tesseract OCR and analyzes it like a message.
     """
@@ -49,6 +50,7 @@ async def analyze_image(file: UploadFile = File(...)):
             text=extracted_text,
             source="image",
             metadata={"filename": file.filename, "content_type": file.content_type},
+            user_id=user and user["id"],
         )
     except Exception:
         logger.exception("Image analysis failed")

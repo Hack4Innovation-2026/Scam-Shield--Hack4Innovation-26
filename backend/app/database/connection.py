@@ -1,25 +1,47 @@
-from motor.motor_asyncio import AsyncIOMotorClient
-import os
+import logging
 
-MONGO_URI = os.getenv("MONGO_URI", "mongodb://localhost:27017")
+from pymongo import AsyncMongoClient
+
+from app import config
+
+logger = logging.getLogger(__name__)
+
 client = None
 db = None
 
+
 async def connect_to_mongo():
+    """Connect if MONGO_URI is set. Never blocks startup for long or crashes the API."""
     global client, db
-    client = AsyncIOMotorClient(MONGO_URI)
-    db = client.scam_detection_db
-    print("Connected to MongoDB")
+    if not config.MONGO_URI:
+        logger.info("MONGO_URI not set - analysis results will not be persisted")
+        return
+    try:
+        client = AsyncMongoClient(config.MONGO_URI, serverSelectionTimeoutMS=2000)
+        await client.admin.command("ping")
+        db = client[config.MONGO_DB]
+        logger.info("Connected to MongoDB database '%s'", config.MONGO_DB)
+    except Exception as e:
+        logger.warning("MongoDB unavailable (%s) - continuing without persistence", e)
+        if client is not None:
+            await client.close()
+        client = None
+        db = None
+
 
 async def close_mongo_connection():
-    global client
-    if client:
-        client.close()
-        print("Closed MongoDB connection")
+    global client, db
+    if client is not None:
+        await client.close()
+        logger.info("Closed MongoDB connection")
+    client = None
+    db = None
+
 
 async def store_analyzed_message(data: dict):
-    if db is not None:
-        try:
-            await db.analyzed_messages.insert_one(data)
-        except Exception as e:
-            print(f"Failed to store message: {e}")
+    if db is None:
+        return
+    try:
+        await db.analyzed_messages.insert_one(data)
+    except Exception as e:
+        logger.warning("Failed to store analyzed message: %s", e)

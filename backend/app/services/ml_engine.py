@@ -1,11 +1,34 @@
 import joblib
-import os
+import logging
 import re
 
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-MODELS_DIR = os.path.join(BASE_DIR, "models")
+from app import config
+
+logger = logging.getLogger(__name__)
+
+MODEL_SOURCES = ("sms", "email")
 
 _cache = {}
+
+
+def load_models():
+    """Load every model/vectorizer pair; raise with a clear message if any file is missing."""
+    missing = []
+    for source in MODEL_SOURCES:
+        for kind in ("model", "vectorizer"):
+            path = config.MODELS_DIR / f"{source}_{kind}.pkl"
+            if not path.exists():
+                missing.append(str(path))
+                continue
+            _cache[f"{source}_{kind}"] = joblib.load(path)
+    if missing:
+        raise RuntimeError("Missing model files: " + ", ".join(missing))
+    logger.info("Loaded models from %s", config.MODELS_DIR)
+
+
+def models_loaded() -> bool:
+    return all(f"{s}_model" in _cache for s in MODEL_SOURCES)
+
 
 def get_ml_prediction(text: str, source: str) -> dict:
     valid_sources = ["sms", "email", "notifications"]
@@ -23,17 +46,10 @@ def get_ml_prediction(text: str, source: str) -> dict:
     vec_key = f"{source}_vectorizer"
 
     if model_key not in _cache:
-        model_path = os.path.join(MODELS_DIR, f"{source}_model.pkl")
-        vec_path = os.path.join(MODELS_DIR, f"{source}_vectorizer.pkl")
-
-        if os.path.exists(model_path) and os.path.exists(vec_path):
-            _cache[model_key] = joblib.load(model_path)
-            _cache[vec_key] = joblib.load(vec_path)
-        else:
-            return {
-                "ml_prediction": "unknown",
-                "ml_risk_score": 0.0
-            }
+        return {
+            "ml_prediction": "unknown",
+            "ml_risk_score": 0.0
+        }
 
     model = _cache[model_key]
     vectorizer = _cache[vec_key]

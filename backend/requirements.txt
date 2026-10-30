@@ -1,0 +1,16 @@
+# Runtime dependencies for the Scam Shield API (tested on Python 3.12-3.14)
+fastapi==0.129.2
+uvicorn[standard]==0.41.0
+pydantic==2.12.5
+python-multipart==0.0.22
+python-dotenv==1.2.1
+# Must match the version the pickled models were saved with
+scikit-learn==1.8.0
+numpy==2.4.6
+scipy==1.17.1
+joblib==1.5.3
+# Email model preprocessing (PorterStemmer + stopwords are pickled nltk objects)
+nltk==3.9.2
+pymongo==4.16.0
+pillow==12.1.0
+pytesseract==0.3.13

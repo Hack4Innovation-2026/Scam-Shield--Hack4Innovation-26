@@ -1,37 +1,53 @@
-from fastapi import FastAPI
+import logging
 from contextlib import asynccontextmanager
+
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
+from app import config
 from app.database.connection import connect_to_mongo, close_mongo_connection
 from app.routes.analysis_routes import router as analysis_router
 from app.routes.email_routes import router as email_router
 from app.routes.image_routes import router as image_router
-import os
-import sys
+from app.services import ml_engine
 
-# Ensure backend root is in PYTHON PATH to fix absolute imports implicitly
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+logging.basicConfig(level=config.LOG_LEVEL, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup actions
+    # Load models up front so a missing file fails at startup, not on the first request.
+    ml_engine.load_models()
     await connect_to_mongo()
     yield
-    # Shutdown actions
     await close_mongo_connection()
 
+
 app = FastAPI(
-    title="CyberGuard Scam Detection API",
-    description="A production-grade scam detection backend prioritizing URL and behavioral intel.",
-    version="1.0.0",
-    lifespan=lifespan
+    title="Scam Shield Detection API",
+    description="Scam detection for SMS, email, URLs and screenshots: URL heuristics, behavioural "
+                "patterns and ML text classifiers combined into one risk score.",
+    version="1.1.0",
+    lifespan=lifespan,
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=config.CORS_ORIGINS,
+    allow_credentials=False,
+    allow_methods=["GET", "POST"],
+    allow_headers=["*"],
 )
 
 app.include_router(analysis_router)
 app.include_router(email_router)
 app.include_router(image_router)
 
+
 @app.get("/", tags=["Health"])
 def health_check():
-    return {"status": "ok", "message": "CyberGuard Scam Detection Engine is online."}
+    return {"status": "ok", "models_loaded": ml_engine.models_loaded()}
+
 
 if __name__ == "__main__":
     import uvicorn

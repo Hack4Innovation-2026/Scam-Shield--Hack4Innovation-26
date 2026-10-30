@@ -101,3 +101,11 @@ def test_pii_masking():
     assert "482913" not in masked
     assert "a.b@x.com" not in masked
     assert "9876543210" not in masked
+
+
+# ---------------------------------------------------------------- advice
+def test_advice_handles_combined_intents():
+    # Combined intents look like "fear / urgency"; they used to fall through to generic advice.
+    from app.services.advice_engine import generate_advice
+    advice = generate_advice([], "fear / urgency", DIGITAL_ARREST_SMS)
+    assert "authorities" in advice.lower()

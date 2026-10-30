@@ -268,6 +268,9 @@ Tests were written against the *intended* behaviour first, then run against the 
 - `extract_urls` dropped `http://192.168.10.5` and `https://t.co/...`, because the abbreviation filter also applied to explicit URLs. Now it applies only to bare matches.
 - A corrupt upload returned 503 (no Tesseract) instead of 400. The image is now validated before the OCR availability check.
 
+A fourth code bug turned up while verifying the README example:
+- `advice_engine` compared `intent in ["fear", "urgency"]`, but combined intents arrive as `"fear / urgency"`. The strongest scams got the generic advice. Now it uses substring matches (`test_advice_handles_combined_intents`).
+
 One was a test expectation:
 - `test_email_model_uses_training_preprocessing` asserted that a short benign email scores < 30. The real model gives it 43. That assertion tested model *quality*, not the pipeline. The test now asserts that the engine feeds the model exactly `clean_email_text(text)`.
 

@@ -1,6 +1,11 @@
 import React, { useState } from 'react';
 import { Shield, Bell, MessageSquare, Activity, CheckCircle2, ChevronRight } from 'lucide-react';
+import { Capacitor } from '@capacitor/core';
 import ScamShield from '../utils/ScamShieldPlugin';
+
+// Device permissions only exist in the Android app; in a browser they cannot be granted.
+const isNative = Capacitor.isNativePlatform();
+const SWITCH_OFF = '#94a3b8';
 
 const PermissionScreen = ({ onComplete }) => {
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
@@ -8,6 +13,7 @@ const PermissionScreen = ({ onComplete }) => {
   const [backgroundEnabled, setBackgroundEnabled] = useState(false);
 
   const allGranted = notificationsEnabled && smsEnabled && backgroundEnabled;
+  const canContinue = allGranted || !isNative;
 
   return (
     <div className="screen" style={{ justifyContent: 'center' }}>
@@ -16,7 +22,11 @@ const PermissionScreen = ({ onComplete }) => {
           <Shield size={48} color="var(--primary)" />
         </div>
         <h1 className="text-h1">Setup Protection</h1>
-        <p className="text-sub" style={{ padding: '0 1rem' }}>Scam Shield requires root-level permissions to actively intercept threats before they reach you.</p>
+        <p className="text-sub" style={{ padding: '0 1rem' }}>
+          {isNative
+            ? 'Scam Shield needs these permissions to scan messages before they reach you.'
+            : 'These permissions apply to the Android app. In the browser you can scan messages manually - continue to get started.'}
+        </p>
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', width: '100%' }}>
@@ -41,8 +51,11 @@ const PermissionScreen = ({ onComplete }) => {
             }}
             style={{ 
               width: '48px', height: '26px', borderRadius: '30px', border: 'none', cursor: 'pointer', position: 'relative', transition: 'background 0.3s',
-              background: notificationsEnabled ? 'var(--accent-safe)' : 'rgba(255,255,255,0.1)'
+              background: notificationsEnabled ? 'var(--accent-safe)' : SWITCH_OFF
             }}
+            role="switch"
+            aria-checked={notificationsEnabled}
+            aria-label="Notification Interceptor"
           >
             <div style={{ 
               width: '20px', height: '20px', background: 'white', borderRadius: '50%', position: 'absolute', top: '3px', transition: 'left 0.3s',
@@ -64,8 +77,11 @@ const PermissionScreen = ({ onComplete }) => {
             onClick={() => setSmsEnabled(!smsEnabled)}
             style={{ 
               width: '48px', height: '26px', borderRadius: '30px', border: 'none', cursor: 'pointer', position: 'relative', transition: 'background 0.3s',
-              background: smsEnabled ? 'var(--accent-safe)' : 'rgba(255,255,255,0.1)'
+              background: smsEnabled ? 'var(--accent-safe)' : SWITCH_OFF
             }}
+            role="switch"
+            aria-checked={smsEnabled}
+            aria-label="Read SMS Log"
           >
             <div style={{ 
               width: '20px', height: '20px', background: 'white', borderRadius: '50%', position: 'absolute', top: '3px', transition: 'left 0.3s',
@@ -87,8 +103,11 @@ const PermissionScreen = ({ onComplete }) => {
             onClick={() => setBackgroundEnabled(!backgroundEnabled)}
             style={{ 
               width: '48px', height: '26px', borderRadius: '30px', border: 'none', cursor: 'pointer', position: 'relative', transition: 'background 0.3s',
-              background: backgroundEnabled ? 'var(--accent-safe)' : 'rgba(255,255,255,0.1)'
+              background: backgroundEnabled ? 'var(--accent-safe)' : SWITCH_OFF
             }}
+            role="switch"
+            aria-checked={backgroundEnabled}
+            aria-label="Background Execution"
           >
             <div style={{ 
               width: '20px', height: '20px', background: 'white', borderRadius: '50%', position: 'absolute', top: '3px', transition: 'left 0.3s',
@@ -107,8 +126,8 @@ const PermissionScreen = ({ onComplete }) => {
         <button 
           className="btn btn-primary" 
           onClick={onComplete}
-          disabled={!allGranted}
-          style={{ width: '100%', transition: 'all 0.3s', opacity: allGranted ? 1 : 0.5 }}
+          disabled={!canContinue}
+          style={{ width: '100%', transition: 'all 0.3s', opacity: canContinue ? 1 : 0.5 }}
         >
           Continue to Login <ChevronRight size={20} />
         </button>

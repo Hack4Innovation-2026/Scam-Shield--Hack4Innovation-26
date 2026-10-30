@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Debug builds only: allow plain HTTP to any host, so a phone can reach the backend on the
+     development PC over Wi-Fi (http://192.168.x.x:8000). Release builds use src/main's stricter file. -->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true" />
+</network-security-config>

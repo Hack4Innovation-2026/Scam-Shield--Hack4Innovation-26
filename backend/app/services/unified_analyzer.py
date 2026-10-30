@@ -85,6 +85,11 @@ async def pipeline_analyze_input(text: str, source: str, metadata: dict, user_id
     log_data["original_text_masked"] = process_and_mask_pii(text)
     if user_id:
         log_data["user_id"] = user_id   # from a verified token only, never from request metadata
+    # Scans made automatically by the Android app (incoming SMS / notifications) are flagged so
+    # history can show where they came from.
+    if metadata.get("channel") == "background":
+        log_data["background"] = True
+        log_data["app"] = str(metadata.get("app") or "")[:80]
     await store_analyzed_message(log_data)
 
     return response

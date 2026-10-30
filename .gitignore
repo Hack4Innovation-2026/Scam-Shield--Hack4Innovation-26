@@ -18,8 +18,7 @@ venv/
 ml/data/
 ml/user_reported_data.csv
 
-# Android / Capacitor / IDE
-android/
+# Android / IDE (frontend/android is committed; its own .gitignore excludes build output)
 *.apk
 .gradle/
 .idea/

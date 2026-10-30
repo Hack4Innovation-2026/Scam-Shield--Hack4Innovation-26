@@ -1,13 +1,26 @@
 import React, { useState } from 'react';
-import { ArrowLeft, Filter, ShieldCheck, ShieldAlert, AlertTriangle } from 'lucide-react';
+import { Filter, ShieldCheck, ShieldAlert, AlertTriangle, MessageSquare, Bell } from 'lucide-react';
+
+// Badge for scans the Android app ran automatically on an incoming SMS or notification.
+const AutoScanBadge = ({ item }) => {
+  const isSms = item.source === 'SMS';
+  const Icon = isSms ? MessageSquare : Bell;
+  return (
+    <span title={item.app || undefined} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.65rem', fontWeight: 600,
+      padding: '0.1rem 0.45rem', borderRadius: '999px', background: 'rgba(59, 130, 246, 0.12)', color: 'var(--primary)', whiteSpace: 'nowrap' }}>
+      <Icon size={11} /> {isSms ? 'SMS' : 'Notification'} · auto-scanned
+    </span>
+  );
+};
 
 const HistoryScreen = ({ history, onNavigate }) => {
-  const [filter, setFilter] = useState('All'); // All, Scam, Safe
+  const [filter, setFilter] = useState('All'); // All, Scam, Safe, Auto-scanned
 
   const filteredHistory = history.filter(item => {
     if (filter === 'All') return true;
     if (filter === 'Scam' && item.level === 'scam') return true;
     if (filter === 'Safe' && item.level === 'safe') return true;
+    if (filter === 'Auto-scanned' && item.background) return true;
     return false;
   });
 
@@ -38,6 +51,7 @@ const HistoryScreen = ({ history, onNavigate }) => {
             <option>All</option>
             <option>Scam</option>
             <option>Safe</option>
+            <option>Auto-scanned</option>
           </select>
         </div>
       </div>
@@ -60,12 +74,15 @@ const HistoryScreen = ({ history, onNavigate }) => {
               </div>
               
               <div style={{ flex: 1, overflow: 'hidden' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.25rem' }}>
-                  <span style={{ fontWeight: 600, fontSize: '0.875rem' }}>{item.source} Scan</span>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.5rem', marginBottom: '0.25rem' }}>
+                  <span style={{ fontWeight: 600, fontSize: '0.875rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {item.background && item.app ? item.app : `${item.source} Scan`}
+                  </span>
                   <span className="text-sub" style={{ fontSize: '0.75rem' }}>
                     {new Date(item.date).toLocaleDateString()}
                   </span>
                 </div>
+                {item.background && <div style={{ marginBottom: '0.25rem' }}><AutoScanBadge item={item} /></div>}
                 <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                   {item.intent} - {item.scamType}
                 </p>

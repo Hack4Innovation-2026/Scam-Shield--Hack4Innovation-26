@@ -99,6 +99,18 @@ public class ScamShieldPlugin extends Plugin {
         call.resolve(status());
     }
 
+    /** Background scans that finished while the app was closed (consumed once). */
+    @PluginMethod
+    public void drainBackgroundScans(PluginCall call) {
+        JSObject ret = new JSObject();
+        try {
+            ret.put("events", new com.getcapacitor.JSArray(BackgroundScanStore.drain(getContext()).toString()));
+        } catch (JSONException e) {
+            ret.put("events", new com.getcapacitor.JSArray());
+        }
+        call.resolve(ret);
+    }
+
     /** The result of the alert the app was opened from, if any (consumed once). */
     @PluginMethod
     public void getPendingResult(PluginCall call) {

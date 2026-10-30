@@ -57,6 +57,9 @@ final class AlertNotifier {
                 .setCategory(NotificationCompat.CATEGORY_MESSAGE)
                 .setColor(0xFFEF4444)
                 .setAutoCancel(true)
+                // Own group per alert: otherwise Android bundles several alerts under one summary,
+                // and tapping that summary opens the app without the specific result.
+                .setGroup("scam_alert_" + requestCode)
                 .setContentIntent(pending);
 
         try {

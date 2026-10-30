@@ -13,7 +13,7 @@ import NotificationSimulation from './components/NotificationSimulation';
 import { Home, Scan, Clock, Settings } from 'lucide-react';
 import { useAuth } from './context/AuthContext';
 import { loadHistory, saveScan } from './utils/historyStore';
-import { syncNativeConfig, subscribeToNativeScans } from './native/nativeScanner';
+import { syncNativeConfig, subscribeToNativeScans, drainBackgroundScans } from './native/nativeScanner';
 function App() {
   const { currentUser, logout } = useAuth();
   const currentUserRef = useRef(currentUser);
@@ -59,6 +59,25 @@ function App() {
   useEffect(() => {
     syncNativeConfig();
   }, [currentUser]);
+
+  // Android: pick up scans of incoming SMS / notifications that ran while the app was closed.
+  useEffect(() => {
+    const collect = async () => {
+      const records = await drainBackgroundScans();
+      if (!records.length) return;
+      if (currentUserRef.current) {
+        // Already saved to the account by the background scanner: refresh from the server.
+        loadHistory(currentUserRef.current).then(setHistory).catch(() => {});
+      } else {
+        for (const record of [...records].reverse()) await saveScan(null, record).catch(() => {});
+        setHistory(prev => [...records, ...prev]);
+      }
+    };
+    collect();
+    const onVisible = () => document.visibilityState === 'visible' && collect();
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, []);
 
   // Android: results of background scans (notifications / SMS) and taps on scam alerts.
   useEffect(() => subscribeToNativeScans({

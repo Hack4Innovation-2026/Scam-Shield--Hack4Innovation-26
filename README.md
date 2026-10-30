@@ -15,7 +15,7 @@ A React (Vite + Capacitor) app is the client. It can be packaged for Android, wh
 
 Built for Hack4Innovation 2026.
 
-**Documentation:** [Local setup](docs/SETUP.md) · [Data storage & MongoDB](docs/DATABASE.md) · [Deployment](docs/DEPLOYMENT.md) · [Changelog](CHANGELOG.md)
+**Documentation:** [Local setup](docs/SETUP.md) · [Android app](docs/ANDROID.md) · [Data storage & MongoDB](docs/DATABASE.md) · [Deployment](docs/DEPLOYMENT.md) · [Changelog](CHANGELOG.md)
 
 ---
 
@@ -77,11 +77,12 @@ backend/            FastAPI service
   app/services/     url_analyzer, behavioral_engine, ml_engine, ocr, risk_scorer, ...
   app/schemas/      pydantic request/response models
   models/           pickled vectorizers + classifiers
-  tests/            pytest suite (74 tests)
+  tests/            pytest suite (75 tests)
   Dockerfile
 frontend/           React 19 + Vite + Capacitor app
   src/api/client.js backend client (the only place that talks to the API)
   src/screens/      UI screens
+frontend/android/   Capacitor Android app + native background scanner (Java)
 ml/                 training + evaluation scripts
   evaluate.py       model evaluation and comparison
   results/          metrics.md, metrics.json, pr_curves.png

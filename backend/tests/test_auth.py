@@ -104,6 +104,7 @@ def test_history_is_per_user(mongo_client):
     assert hist_a[1]["scam_type"] == "digital_arrest"
     assert len(hist_b) == 1 and hist_b[0]["level"] == "safe"
     assert "original_text_masked" not in hist_a[0]
+    assert hist_a[0]["timestamp"].endswith("+00:00")                    # explicit UTC for clients
 
 
 @requires_mongo
@@ -119,3 +120,15 @@ def test_invalid_token_is_401_not_silent_guest(mongo_client):
     r = mongo_client.post("/api/v1/analyze", json={"text": BENIGN_SMS, "source": "sms"}, headers=_auth("garbage"))
     assert r.status_code == 401
     assert mongo_client.get("/api/v1/history").status_code == 401
+
+
+@requires_mongo
+def test_background_scans_are_flagged_in_history(mongo_client):
+    token = _register(mongo_client, email="bg@example.com").json()["token"]
+    mongo_client.post("/api/v1/analyze", headers=_auth(token), json={
+        "text": DIGITAL_ARREST_SMS, "source": "sms",
+        "metadata": {"channel": "background", "app": "SMS from VM-SBIBNK"}})
+    mongo_client.post("/api/v1/analyze", headers=_auth(token), json={"text": BENIGN_SMS, "source": "sms"})
+    manual, background = mongo_client.get("/api/v1/history", headers=_auth(token)).json()
+    assert background["background"] is True and background["app"] == "SMS from VM-SBIBNK"
+    assert "background" not in manual

@@ -92,13 +92,18 @@ async def get_scan_stats(days: int) -> dict:
 
 
 # ---------------------------------------------------------------- accounts
+def _as_utc(ts: datetime.datetime) -> datetime.datetime:
+    """MongoDB returns naive datetimes (stored in UTC). Mark them UTC so clients convert to local time."""
+    return ts.replace(tzinfo=datetime.timezone.utc) if ts.tzinfo is None else ts
+
+
 class EmailAlreadyRegistered(Exception):
     pass
 
 
 def _public_user(doc: dict) -> dict:
     return {"id": str(doc["_id"]), "name": doc["name"], "email": doc["email"],
-            "created_at": doc["created_at"].isoformat()}
+            "created_at": _as_utc(doc["created_at"]).isoformat()}
 
 
 async def create_user(name: str, email: str, password_hash: str) -> dict:
@@ -136,6 +141,6 @@ async def get_user_history(user_id: str, limit: int) -> list[dict]:
     items = []
     async for doc in cursor:
         doc["id"] = str(doc.pop("_id"))
-        doc["timestamp"] = doc["timestamp"].isoformat()
+        doc["timestamp"] = _as_utc(doc["timestamp"]).isoformat()
         items.append(doc)
     return items

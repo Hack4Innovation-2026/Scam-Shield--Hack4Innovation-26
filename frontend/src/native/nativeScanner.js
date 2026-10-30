@@ -2,7 +2,7 @@
 // On the web every call is a no-op, so screens can use it unconditionally.
 import { Capacitor } from '@capacitor/core';
 import ScamShield from '../utils/ScamShieldPlugin';
-import { API_BASE, getToken, toResult } from '../api/client';
+import { API_BASE, getToken, toResult, sourceLabel } from '../api/client';
 
 export const isNative = Capacitor.isNativePlatform();
 
@@ -34,12 +34,24 @@ export const requestAlertPermission = () => (isNative ? ScamShield.requestNotifi
 
 /** Native scan event -> history record in the same shape as an in-app scan. */
 export const eventToRecord = (event) => ({
-  ...toResult(event.result, event.app),
-  id: Date.now(),
-  date: new Date().toISOString(),
+  ...toResult(event.result, sourceLabel(event.source || 'notifications')),
+  id: event.scannedAt || Date.now(),
+  date: new Date(event.scannedAt || Date.now()).toISOString(),
   scannedText: event.text,
   background: true,
+  app: event.app,
 });
+
+/** Background scans that finished while the app was closed, newest first (consumed once). */
+export const drainBackgroundScans = async () => {
+  if (!isNative) return [];
+  try {
+    const { events } = await ScamShield.drainBackgroundScans();
+    return (events || []).filter(e => e?.result).map(eventToRecord).reverse();
+  } catch {
+    return [];
+  }
+};
 
 /**
  * Subscribe to background scans and to "user tapped a scam alert".

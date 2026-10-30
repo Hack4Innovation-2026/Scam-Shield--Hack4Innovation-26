@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { ShieldAlert, AlertTriangle, ShieldCheck, Link as LinkIcon, AlertCircle, ArrowLeft, BarChart3, ScanText } from 'lucide-react';
+import { ShieldAlert, AlertTriangle, ShieldCheck, Link as LinkIcon, AlertCircle, ArrowLeft, BarChart3, ScanText, MessageSquare, Bell } from 'lucide-react';
 
 const CircularProgress = ({ score, color }) => {
   const dashArray = 283;
@@ -105,6 +105,23 @@ const ResultScreen = ({ result, onNavigate }) => {
               </div>
             ))}
           </div>
+        </div>
+      )}
+
+      {result.background && (
+        <div className="glass-card" style={{ marginBottom: '1rem' }}>
+          <h3 className="text-h3" style={{ fontSize: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            {result.source === 'SMS' ? <MessageSquare size={16} className="text-primary" /> : <Bell size={16} className="text-primary" />}
+            Auto-scanned {result.source === 'SMS' ? 'SMS' : 'notification'}
+          </h3>
+          <p className="text-sub" style={{ fontSize: '0.8rem', marginTop: '0.35rem' }}>
+            {result.app ? `From ${result.app}` : 'Incoming message'}{result.date ? ` · ${new Date(result.date).toLocaleString()}` : ''}
+          </p>
+          {result.scannedText && (
+            <p style={{ fontSize: '0.85rem', lineHeight: '1.5', marginTop: '0.5rem', padding: '0.6rem', background: 'var(--input-bg)', borderRadius: 'var(--radius-sm)', wordBreak: 'break-word', color: 'var(--text-primary)' }}>
+              {result.scannedText}
+            </p>
+          )}
         </div>
       )}
 

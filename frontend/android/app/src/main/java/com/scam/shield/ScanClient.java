@@ -33,24 +33,26 @@ final class ScanClient {
     private ScanClient() {}
 
     /** POST /api/v1/analyze. Signed-in scans are saved to the user's history on the server. */
-    static JSONObject analyze(Context context, String text, String source) throws IOException, JSONException {
+    static JSONObject analyze(Context context, String text, String source, String app) throws IOException, JSONException {
         String token = ScanConfig.token(context);
         try {
-            return post(context, text, source, token);
+            return post(context, text, source, app, token);
         } catch (HttpError e) {
             if (e.status == 401 && token != null) {
                 // Expired session: forget the token and scan as a guest rather than dropping the message.
                 ScanConfig.clearToken(context);
-                return post(context, text, source, null);
+                return post(context, text, source, app, null);
             }
             throw e;
         }
     }
 
-    private static JSONObject post(Context context, String text, String source, String token)
+    private static JSONObject post(Context context, String text, String source, String app, String token)
             throws IOException, JSONException {
         if (text.length() > MAX_TEXT_LENGTH) text = text.substring(0, MAX_TEXT_LENGTH);
-        JSONObject body = new JSONObject().put("text", text).put("source", source);
+        // channel=background lets the server flag these scans in the user's history.
+        JSONObject metadata = new JSONObject().put("channel", "background").put("app", app);
+        JSONObject body = new JSONObject().put("text", text).put("source", source).put("metadata", metadata);
 
         HttpURLConnection conn = (HttpURLConnection) new URL(ScanConfig.apiUrl(context) + "/api/v1/analyze").openConnection();
         try {

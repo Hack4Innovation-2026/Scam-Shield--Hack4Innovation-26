@@ -10,9 +10,10 @@ All notable changes to this project are documented here. The format follows [Kee
 - `GET /api/v1/stats`: scan statistics aggregated in MongoDB.
 - Sender-domain checks for emails.
 - Per-signal score breakdown (`signals`) and model category (`ml_category`) in every response.
-- 74 pytest tests across endpoints, engines, accounts, configuration and persistence.
+- 75 pytest tests across endpoints, engines, accounts, configuration and persistence.
 - Model evaluation (`ml/evaluate.py`): stratified hold-out plus 5-fold cross-validation, comparing Random Forest, Logistic Regression, Naive Bayes and Linear SVM.
 - Accounts: separate Log In and Sign Up screens, backend registration and login (bcrypt + JWT), and per-user scan history in MongoDB (`/api/v1/auth/*`, `/api/v1/history`). Guests keep history in local storage.
+- Android app with background scanning: a notification listener and SMS receiver scan incoming messages while the app is closed, raise a high-priority alert for scams (tapping it opens the result), and add every background scan to History with an *SMS / Notification · auto-scanned* badge. See `docs/ANDROID.md`.
 - Frontend API client and a link scan tab.
 - Dockerfile, docker-compose (API + MongoDB), GitHub Actions CI and a Render blueprint.
 

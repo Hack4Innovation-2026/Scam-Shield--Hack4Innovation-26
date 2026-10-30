@@ -47,9 +47,12 @@ public final class MessageScanner {
         listener = l;
     }
 
-    static void publish(JSONObject event) {
+    /** @return true if the app was open to receive the event */
+    static boolean publish(JSONObject event) {
         Listener l = listener;
-        if (l != null) l.onScanResult(event);
+        if (l == null) return false;
+        l.onScanResult(event);
+        return true;
     }
 
     /**

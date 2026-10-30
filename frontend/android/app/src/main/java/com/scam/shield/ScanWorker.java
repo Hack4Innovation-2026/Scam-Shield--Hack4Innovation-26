@@ -37,7 +37,7 @@ public class ScanWorker extends Worker {
 
         JSONObject result;
         try {
-            result = ScanClient.analyze(getApplicationContext(), text, source == null ? "notifications" : source);
+            result = ScanClient.analyze(getApplicationContext(), text, source == null ? "notifications" : source, app);
         } catch (ScanClient.HttpError e) {
             Log.w(TAG, "Scan rejected by server: " + e.getMessage());
             return e.status >= 500 && getRunAttemptCount() < MAX_ATTEMPTS ? Result.retry() : Result.failure();
@@ -55,12 +55,14 @@ public class ScanWorker extends Worker {
 
         JSONObject event = new JSONObject();
         try {
-            event.put("app", app).put("source", source).put("text", text).put("result", result);
+            event.put("app", app).put("source", source).put("text", text).put("result", result)
+                    .put("scannedAt", System.currentTimeMillis());
         } catch (JSONException ignored) {
             // all values are plain strings/objects
         }
         if (risk >= ALERT_THRESHOLD) AlertNotifier.showScamAlert(getApplicationContext(), event);
-        MessageScanner.publish(event);
+        // App open: deliver live. App closed: keep it for History until the app next opens.
+        if (!MessageScanner.publish(event)) BackgroundScanStore.add(getApplicationContext(), event);
         return Result.success();
     }
 }

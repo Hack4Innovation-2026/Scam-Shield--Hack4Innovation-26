@@ -46,7 +46,7 @@ const SOURCE_LABELS = {
   sms: 'SMS', url: 'URL', email: 'Email', image: 'Screenshot', whatsapp: 'WhatsApp',
   instagram: 'Instagram', telegram: 'Telegram', notifications: 'Notification',
 };
-const sourceLabel = (s) => SOURCE_LABELS[s] || capitalize(s);
+export const sourceLabel = (s) => SOURCE_LABELS[s] || capitalize(s);
 
 // Backend snake_case response -> the camelCase shape the screens render.
 export const toResult = (data, displaySource) => ({
@@ -64,6 +64,9 @@ export const toResult = (data, displaySource) => ({
   signals: data.signals || {},
   mlCategory: data.ml_category ? humanize(data.ml_category) : null,
   extractedText: data.extracted_text || null,
+  // Scanned automatically by the Android app from an incoming SMS / notification
+  background: Boolean(data.background),
+  app: data.app || null,
   report: {
     reportRecommended: data.report.report_recommended,
     reportLink: data.report.report_link || 'https://cybercrime.gov.in',

@@ -132,7 +132,8 @@ In development, Vite proxies `/api` to `http://localhost:8000`, so no CORS setup
 
 **Accounts** need MongoDB. Sign-up and login are handled by the backend: passwords are hashed with bcrypt, and sessions use signed JWT tokens. Set `JWT_SECRET` in `backend/.env`; `scripts/setup.ps1` generates one. Without a database the app runs in guest mode, with history kept in the browser.
 
-### Docker
+### Docker (optional)
+**Not needed for local development**: the setup and start scripts above run Python and Node directly. The Docker image is what Render deploys, and CI builds and smoke-tests it on every push. To run the backend in a container yourself, install Docker Desktop, then:
 ```bash
 docker build -t scam-shield-api backend
 docker run -p 8000:8000 scam-shield-api

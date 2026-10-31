@@ -1,5 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { ShieldAlert, AlertTriangle, ShieldCheck, Link as LinkIcon, AlertCircle, ArrowLeft, BarChart3, ScanText, MessageSquare, Bell } from 'lucide-react';
+import { ShieldAlert, AlertTriangle, ShieldCheck, Link as LinkIcon, AlertCircle, ArrowLeft, BarChart3, ScanText, MessageSquare, Bell, ImageOff } from 'lucide-react';
+
+const FORENSICS_STYLE = {
+  possible_editing: { label: 'Possible editing', color: 'var(--accent-scam)' },
+  inconclusive: { label: 'Inconclusive', color: 'var(--accent-warning)' },
+  no_signs: { label: 'No signs of editing', color: 'var(--accent-safe)' },
+  not_applicable: { label: "Can't assess", color: 'var(--text-secondary)' },
+};
 
 const CircularProgress = ({ score, color }) => {
   const dashArray = 283;
@@ -133,6 +140,34 @@ const ResultScreen = ({ result, onNavigate }) => {
           <p className="text-sub" style={{ fontSize: '0.8rem', lineHeight: '1.5', marginTop: '0.5rem', wordBreak: 'break-word' }}>{result.extractedText}</p>
         </div>
       )}
+
+      {result.forensics && (() => {
+        const f = result.forensics;
+        const style = FORENSICS_STYLE[f.verdict] || FORENSICS_STYLE.not_applicable;
+        return (
+          <div className="glass-card" style={{ marginBottom: '1rem', borderLeft: `3px solid ${style.color}` }}>
+            <h3 className="text-h3" style={{ fontSize: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <ImageOff size={16} style={{ color: style.color }} /> Image tampering check
+              <span style={{ marginLeft: 'auto', fontSize: '0.75rem', fontWeight: 600, color: style.color }}>{style.label}</span>
+            </h3>
+            <p className="text-sub" style={{ fontSize: '0.8rem', lineHeight: '1.5', marginTop: '0.5rem' }}>{f.summary}</p>
+            {f.flags.length > 0 && (
+              <ul style={{ fontSize: '0.8rem', margin: '0.5rem 0 0 1rem', color: 'var(--text-primary)' }}>
+                {f.flags.map(flag => <li key={flag}>{flag}</li>)}
+              </ul>
+            )}
+            {f.heatmap && (
+              <figure style={{ margin: '0.75rem 0 0' }}>
+                <img src={f.heatmap} alt="Compression map of the uploaded image; regions that may have been added later are tinted red"
+                  style={{ width: '100%', borderRadius: 'var(--radius-sm)', display: 'block' }} />
+                <figcaption className="text-sub" style={{ fontSize: '0.7rem', marginTop: '0.35rem' }}>
+                  Red = regions that lack the image's earlier compression. Not part of the scam score above.
+                </figcaption>
+              </figure>
+            )}
+          </div>
+        );
+      })()}
 
       <div className="glass-card" style={{ marginBottom: '1rem' }}>
         <h3 className="text-h3" style={{ fontSize: '1rem' }}>Analysis Details</h3>

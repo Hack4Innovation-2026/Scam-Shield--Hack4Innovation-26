@@ -64,6 +64,15 @@ export const toResult = (data, displaySource) => ({
   signals: data.signals || {},
   mlCategory: data.ml_category ? humanize(data.ml_category) : null,
   extractedText: data.extracted_text || null,
+  // Image uploads: heuristic tampering hints (JPEG ghost check + metadata), separate from the risk score
+  forensics: data.forensics ? {
+    verdict: data.forensics.verdict,
+    summary: data.forensics.summary,
+    flags: data.forensics.flags || [],
+    earlierQuality: data.forensics.earlier_quality,
+    jpegQuality: data.forensics.jpeg_quality,
+    heatmap: data.forensics.heatmap || null,
+  } : null,
   // Scanned automatically by the Android app from an incoming SMS / notification
   background: Boolean(data.background),
   app: data.app || null,

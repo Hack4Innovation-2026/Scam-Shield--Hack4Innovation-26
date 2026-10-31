@@ -2,6 +2,12 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Added
+- Image tampering check on screenshot uploads: JPEG ghost analysis highlights regions that lack the image's earlier compression, as if added later, plus metadata checks (editing software, modified after capture). Returned as `forensics` beside the scam result and shown with a heatmap; it never changes the risk score. Images it can't assess (PNG, JPEGs saved once) are reported as such.
+- 24 tests for the tampering check (99 in total).
+
 ## [1.1.0] - 2026-10-30
 
 ### Added

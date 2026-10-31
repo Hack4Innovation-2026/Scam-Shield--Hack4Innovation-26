@@ -192,6 +192,36 @@ def test_image_result_depends_on_image_content(client):
 
 
 @requires_tesseract
+def test_image_png_returns_forensics_without_ela(client):
+    body = _image(client, _png_with_text("Payment successful\nRs 2,500 to Ramesh Kumar")).json()
+    assert body["forensics"]["verdict"] == "not_applicable"
+    assert body["forensics"]["heatmap"] is None
+
+
+@requires_tesseract
+def test_image_jpeg_edited_with_photoshop_is_flagged_but_not_scored(client):
+    img = Image.open(io.BytesIO(_png_with_text("Payment successful\nRs 25,000 to Ramesh Kumar"))).convert("RGB")
+    exif = Image.Exif()
+    exif[0x0131] = "Adobe Photoshop 25.0"
+    buf = io.BytesIO()
+    img.save(buf, "JPEG", quality=92, exif=exif)
+    body = _image(client, buf.getvalue(), name="receipt.jpg", ctype="image/jpeg").json()
+    assert body["forensics"]["verdict"] == "possible_editing"
+    assert any("Photoshop" in flag for flag in body["forensics"]["flags"])
+    assert body["level"] == "safe"           # tampering hints never change the scam score
+
+
+@requires_tesseract
+def test_image_forensics_failure_still_returns_analysis(client, monkeypatch):
+    def boom(_image):
+        raise RuntimeError("forensics crashed")
+    monkeypatch.setattr("app.services.image_forensics.analyze", boom)
+    r = _image(client, _png_with_text("See you at lunch tomorrow"))
+    assert r.status_code == 200
+    assert r.json()["forensics"] is None
+
+
+@requires_tesseract
 def test_image_without_text_is_422(client):
     blank = io.BytesIO()
     Image.new("RGB", (200, 200), "white").save(blank, format="PNG")

@@ -63,7 +63,13 @@ $env:JAVA_HOME = "C:\Program Files\Android\Android Studio\jbr"
 ```
 The APK is written to `frontend/android/app/build/outputs/apk/debug/app-debug.apk`.
 
-`frontend/android/local.properties` must contain the SDK path, for example `sdk.dir=D\:\\Claude`. Android Studio writes it automatically; it is gitignored.
+`frontend/android/local.properties` must contain the SDK path. Write it with forward slashes, for example `sdk.dir=C:/Users/<you>/AppData/Local/Android/Sdk`: in this file a backslash is an escape character, so `D:\Claude` is read as `D:Claude`. Android Studio writes the file automatically when it opens the project; it is gitignored.
+
+**Build fails with `Unable to establish loopback connection`:** Java can't use the Windows temp folder, usually because C: is full or the user name contains a space. Point Java at a short folder and build again:
+```powershell
+New-Item -ItemType Directory -Force D:\DevCache\tmp
+$env:JAVA_TOOL_OPTIONS = "-Djdk.net.unixdomain.tmpdir=D:\DevCache\tmp -Djava.io.tmpdir=D:\DevCache\tmp"
+```
 
 ## Backend address
 
@@ -80,7 +86,7 @@ Release builds allow plain HTTP only to `10.0.2.2` and `localhost`; everything e
 ## Testing on the emulator
 
 ```powershell
-$adb = "D:\Claude\platform-tools\adb.exe"
+$adb = "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe"   # or <your SDK folder>\platform-tools\adb.exe
 & $adb install -r app\build\outputs\apk\debug\app-debug.apk
 
 # grant everything without tapping through Settings

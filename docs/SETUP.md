@@ -30,10 +30,7 @@ git clone https://github.com/Hack4Innovation-2026/Scam-Shield--Hack4Innovation-2
 cd Scam-Shield--Hack4Innovation-26
 ```
 
-If the latest changes have not been merged into `main` yet, check out the working branch:
-```powershell
-git checkout fix-and-run
-```
+Already cloned earlier? Get the latest version instead with `git pull`.
 
 ## 3. Run the setup script
 
@@ -54,7 +51,7 @@ It is safe to run again at any time, for example after pulling new changes.
 
 ## 4. Connect the database (optional)
 
-Without a database the app works fully, but scans are not stored and `/api/v1/stats` returns `503`.
+Without a database, scanning works but **accounts, history sync and stats are disabled**, and only guest mode is available.
 
 The database password is **not** in the repository, so each machine needs it in its own `backend\.env`:
 
@@ -62,6 +59,8 @@ The database password is **not** in the repository, so each machine needs it in 
 2. **Allow this machine's IP in Atlas:** cloud.mongodb.com → *Security → Network Access → Add IP Address → Add Current IP Address*. Each network (home, college, hotspot) has a different IP, so repeat this when you change networks.
 
 Full details: [DATABASE.md](DATABASE.md).
+
+Each machine gets its own `JWT_SECRET` (the setup script generates it). That's fine: accounts live in MongoDB, so you log in with the same email and password on both machines.
 
 ## 5. Start the app
 
@@ -81,7 +80,26 @@ On the login screen, use **Sign Up** to create an account (needs the database fr
 
 **To stop the app**, close both windows or press `Ctrl+C` in each.
 
-## 6. Run the tests
+## 6. Android app (optional)
+
+Needs Android Studio plus about 10 GB free disk space. Full guide: [ANDROID.md](ANDROID.md).
+
+1. Install Android Studio: `winget install Google.AndroidStudio`. Open it once and finish the setup wizard. Then open **≡ → Tools → SDK Manager** and install **Android 16 (API 36)**, **Build-Tools**, **Platform-Tools** and **Emulator**.
+2. In **≡ → Tools → Device Manager**, create a virtual device (e.g. Pixel) and download its system image. Skip this if you'll use a real phone.
+3. Create `frontend\android\local.properties` containing your SDK folder with forward slashes, e.g. `sdk.dir=C:/Users/<you>/AppData/Local/Android/Sdk`. The SDK Manager shows the path at the top.
+4. Build and install:
+   ```powershell
+   cd frontend
+   $env:VITE_API_URL = "http://10.0.2.2:8000"   # emulator; for a phone use http://<PC-IP>:8000 or the deployed URL
+   npx vite build; npx cap sync android
+   cd android
+   $env:JAVA_HOME = "C:\Program Files\Android\Android Studio\jbr"
+   .\gradlew assembleDebug
+   & "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe" install -r app\build\outputs\apk\debug\app-debug.apk
+   ```
+5. Keep the backend running (step 5). In the app, turn on the three permissions on the first screen.
+
+## 7. Run the tests
 
 ```powershell
 cd backend
@@ -100,6 +118,10 @@ The tests never write to the database configured in `.env`.
 | Screenshot scan returns *OCR unavailable* | Install Tesseract (step 1) and restart the backend. |
 | `pip install` fails building a package | Python is too new for a pinned package, or too old. Install Python 3.12 and delete `backend\.venv`, then re-run the setup script. |
 | `running scripts is disabled on this system` | Use the full command shown above, including `powershell -ExecutionPolicy Bypass -File`. |
+| Logged out every time the backend restarts | `JWT_SECRET` is empty in `backend\.env`. Re-run `scripts\setup.ps1` (it generates one) and restart. |
+| Android build: `Unable to establish loopback connection` | Java can't use the Windows temp folder (full disk, or a space in the user name). Create `D:\DevCache\tmp`, run `$env:JAVA_TOOL_OPTIONS = "-Djdk.net.unixdomain.tmpdir=D:\DevCache\tmp -Djava.io.tmpdir=D:\DevCache\tmp"`, then build again. |
+| Android build: download `Read timed out` | Slow connection. Run the build again; Gradle resumes library downloads. |
+| `ENOSPC` / "no space left on device" | Free space on C: (Disk Cleanup), or move caches to another drive: set `GRADLE_USER_HOME` and `ANDROID_AVD_HOME` to a folder on D:, and run `npm config set cache D:\DevCache\npm-cache`. |
 
 ## macOS / Linux
 
@@ -109,7 +131,8 @@ The scripts are for Windows. On macOS or Linux, run the equivalent steps by hand
 cd backend
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements-dev.txt
-cp .env.example .env                       # then add MONGO_URI
+cp .env.example .env                       # then add MONGO_URI, and set JWT_SECRET to:
+python -c "import secrets; print(secrets.token_urlsafe(48))"
 uvicorn main:app --reload --port 8000      # terminal 1
 
 cd ../frontend

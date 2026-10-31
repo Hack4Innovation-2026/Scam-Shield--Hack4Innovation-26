@@ -54,6 +54,18 @@ class SignalScores(BaseModel):
     ml: Optional[float] = None
 
 
+class ImageForensics(BaseModel):
+    """Heuristic tampering hints for an uploaded image. Not part of the scam risk score."""
+    verdict: str                       # no_signs | inconclusive | possible_editing | not_applicable
+    summary: str
+    method: Optional[str] = None       # "jpeg_ghost" when the compression check ran, else None
+    score: Optional[float] = None      # share of regions lacking the earlier compression
+    jpeg_quality: Optional[int] = None
+    earlier_quality: Optional[int] = None  # quality of an earlier save, recovered by the ghost check
+    flags: List[str] = []
+    heatmap: Optional[str] = None      # PNG data URL, anomalous regions tinted red
+
+
 class AnalysisResponse(BaseModel):
     risk_score: int
     level: str
@@ -70,6 +82,7 @@ class AnalysisResponse(BaseModel):
     signals: SignalScores
     ml_category: Optional[str] = None
     extracted_text: Optional[str] = None
+    forensics: Optional[ImageForensics] = None
 
 
 # ---------------------------------------------------------------- accounts

@@ -11,7 +11,9 @@ Scam detection for the messages people actually get: SMS, WhatsApp/Telegram text
 - **Behavioural patterns:** urgency, fear, reward and authority cues.
 - **ML text classifiers:** TF-IDF + Random Forest for SMS, CountVectorizer + Random Forest for email.
 
-A React (Vite + Capacitor) app is the client. It can be packaged for Android, where a native plugin feeds incoming notifications to the scanner.
+Uploaded screenshots are read with Tesseract OCR and scored the same way. They also get a separate **image tampering check**: a JPEG ghost analysis that highlights regions added after the image was first saved (a typical fake payment receipt), plus metadata checks for editing software. It is a hint shown beside the result, not part of the risk score.
+
+A React (Vite + Capacitor) app is the client. Packaged for Android, its native layer scans incoming SMS and notifications in the background, even when the app is closed (see [docs/ANDROID.md](docs/ANDROID.md)).
 
 Built for Hack4Innovation 2026.
 
@@ -77,7 +79,7 @@ backend/            FastAPI service
   app/services/     url_analyzer, behavioral_engine, ml_engine, ocr, risk_scorer, ...
   app/schemas/      pydantic request/response models
   models/           pickled vectorizers + classifiers
-  tests/            pytest suite (75 tests)
+  tests/            pytest suite (99 tests)
   Dockerfile
 frontend/           React 19 + Vite + Capacitor app
   src/api/client.js backend client (the only place that talks to the API)
@@ -228,11 +230,12 @@ curl -s localhost:8000/api/v1/analyze -H "Content-Type: application/json" \
 - **Analyse raw text, store masked text.** Masking before inference breaks URLs and feeds the models tokens they never saw.
 - **Own authentication instead of a third-party SDK.** The same token works for the web app and the Android app. Passwords are bcrypt-hashed. Login errors don't reveal which emails are registered, and the user id comes only from the verified token, never from request data.
 - **No fabricated results.** If the backend is down, the app says so, and the OCR endpoint returns `503` when Tesseract is missing.
+- **Tampering check: say "can't assess" rather than guess.** Error Level Analysis was tried first and dropped: on synthetic tests it flagged about half of untouched receipts. The JPEG ghost check flagged none of them and caught every edit exported at a higher quality. When an image has no earlier compression to compare against (PNG screenshots, JPEGs saved once), the app says it can't assess it.
 
 ## Known limitations & roadmap
 
 - The SMS model is poorly calibrated on benign text; a legitimate bank OTP SMS scores ≈ 40 ("suspicious"). Next step: retrain a calibrated linear model on a documented dataset and swap it in.
 - Email model: Enron-era training data, CountVectorizer + RF, no URL or sender features.
-- The native Android `ScamShield` plugin (notification listener, toast) source is not in this repository; on the web, the bridge is skipped.
+- Image tampering check: works on JPEGs that were compressed before being edited (e.g. a forwarded screenshot). It can't assess PNG screenshots or JPEGs saved once, misses edits saved again at the same quality, and was calibrated on synthetic edits only.
 - No caller-ID / phone-number reputation source. The earlier simulated "Call" tab was removed.
 - OCR is English-only (`tesseract-ocr` default language pack).

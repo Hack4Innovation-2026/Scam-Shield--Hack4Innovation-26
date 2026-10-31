@@ -25,5 +25,7 @@ export const loadHistory = (user) => (user ? fetchHistory() : Promise.resolve(re
 
 export const saveScan = async (user, record) => {
   if (user) return;   // already stored by the backend with the scan
-  writeLocal([record, ...readLocal()]);
+  // The tampering heatmap is ~100 KB; keep the verdict but not the picture in localStorage.
+  const stored = record.forensics ? { ...record, forensics: { ...record.forensics, heatmap: null } } : record;
+  writeLocal([stored, ...readLocal()]);
 };

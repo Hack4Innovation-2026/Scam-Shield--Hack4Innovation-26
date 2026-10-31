@@ -4,8 +4,8 @@ from fastapi import APIRouter, Depends, UploadFile, File, HTTPException
 from fastapi.concurrency import run_in_threadpool
 
 from app import config
-from app.schemas.models import AnalysisResponse
-from app.services import ocr
+from app.schemas.models import AnalysisResponse, ImageForensics
+from app.services import image_forensics, ocr
 from app.services.unified_analyzer import pipeline_analyze_input
 from app.dependencies import get_optional_user
 
@@ -19,6 +19,7 @@ router = APIRouter(prefix="/api/v1/analyze/image", tags=["Image Analysis"])
 async def analyze_image(file: UploadFile = File(...), user: dict | None = Depends(get_optional_user)):
     """
     Extracts text from a screenshot with Tesseract OCR and analyzes it like a message.
+    Also returns heuristic tampering hints (Error Level Analysis for JPEGs, metadata checks).
     """
     if not (file.content_type or "").startswith("image/"):
         raise HTTPException(status_code=415, detail="Upload must be an image (PNG, JPEG, ...)")
@@ -45,11 +46,22 @@ async def analyze_image(file: UploadFile = File(...), user: dict | None = Depend
     if len(extracted_text) < 3:
         raise HTTPException(status_code=422, detail="No readable text found in the image")
 
+    # A failed tampering check must not cost the user their scam analysis.
+    try:
+        forensics = ImageForensics(**await run_in_threadpool(image_forensics.analyze, image))
+    except Exception:
+        logger.exception("Image forensics failed")
+        forensics = None
+
+    metadata = {"filename": file.filename, "content_type": file.content_type}
+    if forensics:
+        metadata["forensics"] = {"verdict": forensics.verdict, "method": forensics.method, "score": forensics.score,
+                                 "flags": forensics.flags}
     try:
         response = await pipeline_analyze_input(
             text=extracted_text,
             source="image",
-            metadata={"filename": file.filename, "content_type": file.content_type},
+            metadata=metadata,
             user_id=user and user["id"],
         )
     except Exception:
@@ -57,4 +69,5 @@ async def analyze_image(file: UploadFile = File(...), user: dict | None = Depend
         raise HTTPException(status_code=500, detail="Analysis failed")
 
     response.extracted_text = extracted_text
+    response.forensics = forensics
     return response

@@ -1,6 +1,6 @@
 // Scan history: on the server for signed-in users (scans are saved automatically when the request
 // carries their token), in localStorage for guests.
-import { fetchHistory } from '../api/client';
+import { deleteHistory, fetchHistory } from '../api/client';
 
 const LOCAL_KEY = 'scamShieldHistory';
 const MAX_ITEMS = 100;
@@ -22,6 +22,19 @@ const writeLocal = (items) => {
 };
 
 export const loadHistory = (user) => (user ? fetchHistory() : Promise.resolve(readLocal()));
+
+// Deletes the history on this device, and for a signed-in user also on the server (first, so a
+// failed request leaves everything as it was). Resolves to the number of scans deleted.
+export const clearHistory = async (user) => {
+  const serverCount = user ? (await deleteHistory()).deleted : 0;
+  const localCount = readLocal().length;
+  try {
+    localStorage.removeItem(LOCAL_KEY);
+  } catch {
+    // storage blocked: there is nothing persisted to clear
+  }
+  return serverCount + localCount;
+};
 
 export const saveScan = async (user, record) => {
   if (user) return;   // already stored by the backend with the scan

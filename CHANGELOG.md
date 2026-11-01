@@ -7,6 +7,12 @@ All notable changes to this project are documented here. The format follows [Kee
 ### Added
 - Image tampering check on screenshot uploads: JPEG ghost analysis highlights regions that lack the image's earlier compression, as if added later, plus metadata checks (editing software, modified after capture). Returned as `forensics` beside the scam result and shown with a heatmap; it never changes the risk score. Images it can't assess (PNG, JPEGs saved once) are reported as such.
 - 24 tests for the tampering check (99 in total).
+- Automatic expiry of stored scans: a TTL index deletes scans after `SCAN_RETENTION_DAYS` days (default 90, `0` keeps them forever). Existing databases have their old `{timestamp: -1}` index converted at startup without an `IndexOptionsConflict`. Accounts never expire.
+- *Delete my history*: `DELETE /api/v1/history` deletes the signed-in user's scans and returns `{"deleted": <count>}`. Settings has a button with a confirmation step that clears the history on the server and on the device, and states the retention period.
+- 6 tests for retention and history deletion (105 in total).
+
+### Changed
+- CORS now allows `DELETE` requests, for history deletion.
 
 ## [1.1.0] - 2026-10-30
 

@@ -124,6 +124,8 @@ Screenshot scanning needs the Tesseract binary. Without it the image endpoint re
 
 MongoDB is **optional**. It stores a PII-masked record of every analysis and powers `/api/v1/stats`. Leave `MONGO_URI` empty to run without it. Setup for Atlas, local install or Docker is in [docs/DATABASE.md](docs/DATABASE.md).
 
+**Privacy.** Stored scans expire automatically after 90 days (`SCAN_RETENTION_DAYS` in `backend/.env`; `0` keeps them forever). Users can delete their whole history at any time from **Settings → Delete my history**, which clears it on the server and on the device.
+
 ### Frontend
 ```bash
 cd frontend
@@ -169,6 +171,7 @@ The free setup is Vercel (frontend), Render (API, via `render.yaml`) and MongoDB
 | POST | `/api/v1/auth/login` | `{"email", "password"}` → `{"token", "user"}` |
 | GET | `/api/v1/auth/me` | the signed-in user (`Authorization: Bearer <token>`) |
 | GET | `/api/v1/history` | the signed-in user's scans, newest first |
+| DELETE | `/api/v1/history` | deletes the signed-in user's scans → `{"deleted": <count>}` |
 
 Analyze requests that carry a valid `Authorization: Bearer <token>` header are saved to that user's history. Without the header, the scan is anonymous.
 | GET | `/` | health check (models and database status) |

@@ -41,6 +41,19 @@ That record serves three purposes:
 
 **Indexes** (created on startup): `{timestamp: -1}` and `{level: 1, timestamp: -1}` for stats, `{user_id: 1, timestamp: -1}` for history, and a unique index on `users.email`.
 
+**Retention.** Scans expire automatically: the `{timestamp: -1}` index is a TTL index, and MongoDB deletes each scan `SCAN_RETENTION_DAYS` days after its `timestamp` (default 90; its background job runs about once a minute). `SCAN_RETENTION_DAYS=0` keeps scans forever, with a plain index. Only `analyzed_messages` expires; `users` has no TTL, so accounts never expire. Users can also delete their own scans at any time with `DELETE /api/v1/history` (Settings → *Delete my history* in the app).
+
+Databases created before this setting already have a `{timestamp: -1}` index without TTL. Creating an index with the same key and different options raises `IndexOptionsConflict`, so startup (`ensure_scan_expiry` in `app/database/connection.py`) checks the existing index first:
+
+| Existing `{timestamp: -1}` index | Setting | What startup does |
+|---|---|---|
+| none (fresh database) | any | creates it, with TTL unless the setting is `0` |
+| same TTL as the setting | any | nothing |
+| no TTL, or a different TTL | > 0 | `collMod` sets `expireAfterSeconds` in place (MongoDB 5.1+, which includes Atlas); drops and recreates the index if that fails |
+| has TTL | `0` | drops and recreates it without TTL (`collMod` cannot remove TTL) |
+
+The startup log says which happened, for example `Scan retention: 90 days (timestamp TTL index converted with collMod)`. If the setup fails, the API logs a warning and starts anyway; scans then don't expire until the next successful startup.
+
 **Passwords** are never stored. Only bcrypt hashes are, and API responses never include them.
 
 ## Why a document database here

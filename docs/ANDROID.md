@@ -97,8 +97,10 @@ $adb = "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe"   # or <your SDK f
 # simulate an incoming scam SMS (works with the app closed)
 & $adb emu sms send 5551234 "URGENT: Your SBI account is blocked. Update KYC now at http://sbi-kyc-update.xyz"
 
-# simulate a messaging-app notification
-& $adb shell cmd notification post -S bigtext -t "VM-SBIBNK" scamtest "Your account will be suspended. Verify immediately at http://bit.ly/secure-acc"
+# simulate a messaging-app notification. Quote the whole command, and the title and text again
+# inside it: adb shell re-splits on spaces, and texts under 8 characters are not scanned.
+# Use a new tag (scamtest) per test; the same text is scanned only once every 2 minutes.
+& $adb shell "cmd notification post -S bigtext -t 'VM-SBIBNK' scamtest 'Your account will be suspended. Verify immediately at http://bit.ly/secure-acc'"
 
 # watch the scanner
 & $adb logcat -s ScamShield

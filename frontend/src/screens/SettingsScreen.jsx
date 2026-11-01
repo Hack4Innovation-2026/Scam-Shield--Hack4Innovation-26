@@ -1,14 +1,37 @@
 import React, { useState } from 'react';
-import { User, Shield, Bell, Lock, LogOut, ChevronRight, Moon, Sun, X } from 'lucide-react';
+import { createPortal } from 'react-dom';
+import { User, Shield, Bell, Lock, LogOut, ChevronRight, Moon, Sun, X, Trash2, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { isNative, openNotificationAccessSettings } from '../native/nativeScanner';
+import { clearHistory } from '../utils/historyStore';
 
-const SettingsScreen = ({ privacyMode, setPrivacyMode, isDarkMode, setIsDarkMode, onLogout }) => {
+// Matches the backend default SCAN_RETENTION_DAYS. Hard-coded because in development only /api is
+// proxied to the backend, so the health endpoint (GET /) is not reachable from the browser.
+const SCAN_RETENTION_DAYS = 90;
+
+const SettingsScreen = ({ privacyMode, setPrivacyMode, isDarkMode, setIsDarkMode, onLogout, onHistoryDeleted }) => {
   const [popupData, setPopupData] = useState(null); // { title, message }
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteStatus, setDeleteStatus] = useState(null); // { ok, message }
   const { currentUser } = useAuth();
 
   const showPopup = (title, message) => {
     setPopupData({ title, message });
+  };
+
+  const handleDeleteHistory = async () => {
+    setDeleting(true);
+    try {
+      const count = await clearHistory(currentUser);
+      onHistoryDeleted();
+      setDeleteStatus({ ok: true, message: `Deleted ${count} saved ${count === 1 ? 'scan' : 'scans'}.` });
+    } catch (err) {
+      setDeleteStatus({ ok: false, message: err.message || 'Could not delete your history. Please try again.' });
+    } finally {
+      setDeleting(false);
+      setConfirmDelete(false);
+    }
   };
 
   const enableNativeListener = () => {
@@ -91,6 +114,28 @@ const SettingsScreen = ({ privacyMode, setPrivacyMode, isDarkMode, setIsDarkMode
 
       </div>
 
+      <h3 className="text-h3" style={{ fontSize: '1rem', marginBottom: '1rem' }}>Your Data</h3>
+
+      <div className="glass-card" style={{ marginBottom: '2rem' }}>
+        <p className="text-sub" style={{ fontSize: '0.875rem', margin: 0, marginBottom: '1rem' }}>
+          Scans are deleted automatically after {SCAN_RETENTION_DAYS} days.
+        </p>
+
+        {deleteStatus && (
+          <div role={deleteStatus.ok ? 'status' : 'alert'} style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem', background: deleteStatus.ok ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)', padding: '0.75rem', borderRadius: 'var(--radius-md)', marginBottom: '1rem', borderLeft: `3px solid ${deleteStatus.ok ? 'var(--accent-safe)' : 'var(--accent-scam)'}` }}>
+            {deleteStatus.ok
+              ? <CheckCircle2 size={16} className="text-safe" style={{ marginTop: '2px', flexShrink: 0 }} />
+              : <AlertCircle size={16} className="text-scam" style={{ marginTop: '2px', flexShrink: 0 }} />}
+            <p style={{ margin: 0, fontSize: '0.875rem', color: deleteStatus.ok ? 'var(--accent-safe)' : 'var(--accent-scam)' }}>{deleteStatus.message}</p>
+          </div>
+        )}
+
+        <button className="btn btn-secondary" style={{ width: '100%', color: 'var(--accent-scam)', borderColor: 'var(--accent-scam)' }} onClick={() => { setDeleteStatus(null); setConfirmDelete(true); }}>
+          <Trash2 size={20} />
+          Delete my history
+        </button>
+      </div>
+
       <button className="btn btn-secondary" style={{ width: '100%', marginTop: 'auto', color: 'var(--accent-scam)', borderColor: 'var(--accent-scam)' }} onClick={onLogout}>
         <LogOut size={20} />
         Log Out
@@ -114,6 +159,26 @@ const SettingsScreen = ({ privacyMode, setPrivacyMode, isDarkMode, setIsDarkMode
             <button className="btn btn-primary" style={{ marginTop: '1.5rem' }} onClick={() => setPopupData(null)}>Close</button>
           </div>
         </div>
+      )}
+
+      {/* Delete-history confirmation. Portalled to <body>: .screen's animation transform would
+          otherwise make position:fixed relative to the scrolled screen, pushing the dialog off the top. */}
+      {confirmDelete && createPortal(
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', zIndex: 100, display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '2rem' }}>
+          <div className="glass-card" role="alertdialog" aria-labelledby="delete-history-title" style={{ width: '100%', maxWidth: '416px', background: 'var(--bg-dark)' }}>
+            <h3 id="delete-history-title" className="text-h3" style={{ margin: 0, marginBottom: '1rem' }}>Delete my history</h3>
+            <p className="text-sub" style={{ lineHeight: '1.5', color: 'var(--text-primary)' }}>
+              This permanently deletes all your saved scans. Continue?
+            </p>
+            <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1.5rem' }}>
+              <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => setConfirmDelete(false)} disabled={deleting}>Cancel</button>
+              <button className="btn btn-primary" style={{ flex: 1, background: 'var(--accent-scam)' }} onClick={handleDeleteHistory} disabled={deleting}>
+                {deleting ? 'Deleting…' : 'Delete'}
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
       )}
 
     </div>

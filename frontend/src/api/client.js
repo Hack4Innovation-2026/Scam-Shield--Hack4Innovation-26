@@ -158,3 +158,6 @@ export const fetchHistory = async () => {
   const items = await request('/api/v1/history');
   return items.map(item => ({ ...toResult(item), id: item.id, date: item.timestamp }));
 };
+
+// Permanently delete the signed-in user's saved scans. Resolves to { deleted: <count> }.
+export const deleteHistory = () => request('/api/v1/history', { method: 'DELETE' });

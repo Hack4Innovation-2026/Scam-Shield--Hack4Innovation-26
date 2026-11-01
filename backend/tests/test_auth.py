@@ -1,5 +1,6 @@
 """Accounts: password hashing, tokens, and the register/login/history flow."""
 import datetime
+import os
 
 import jwt
 import pytest
@@ -43,6 +44,7 @@ def test_accounts_unavailable_without_database(client):
     assert r.status_code == 503
     assert client.post("/api/v1/auth/login", json={"email": "a@b.co", "password": "password1"}).status_code == 503
     assert client.get("/api/v1/history").status_code == 503
+    assert client.delete("/api/v1/history").status_code == 503
 
 
 @pytest.mark.parametrize("payload", [
@@ -132,3 +134,28 @@ def test_background_scans_are_flagged_in_history(mongo_client):
     manual, background = mongo_client.get("/api/v1/history", headers=_auth(token)).json()
     assert background["background"] is True and background["app"] == "SMS from VM-SBIBNK"
     assert "background" not in manual
+
+
+@requires_mongo
+def test_delete_history_requires_login(mongo_client):
+    assert mongo_client.delete("/api/v1/history").status_code == 401
+
+
+@requires_mongo
+def test_delete_history_deletes_only_own_scans(mongo_client):
+    a = _register(mongo_client, email="a@example.com").json()["token"]
+    b = _register(mongo_client, email="b@example.com").json()["token"]
+    mongo_client.post("/api/v1/analyze", json={"text": DIGITAL_ARREST_SMS, "source": "sms"}, headers=_auth(a))
+    mongo_client.post("/api/v1/analyze", json={"text": BENIGN_SMS, "source": "sms"}, headers=_auth(a))
+    mongo_client.post("/api/v1/analyze", json={"text": BENIGN_SMS, "source": "sms"}, headers=_auth(b))
+    mongo_client.post("/api/v1/analyze", json={"text": BENIGN_SMS, "source": "sms"})          # guest
+
+    r = mongo_client.delete("/api/v1/history", headers=_auth(a))
+    assert r.status_code == 200 and r.json() == {"deleted": 2}
+    assert mongo_client.get("/api/v1/history", headers=_auth(a)).json() == []
+    assert len(mongo_client.get("/api/v1/history", headers=_auth(b)).json()) == 1             # other user untouched
+
+    from pymongo import MongoClient
+    assert MongoClient(os.environ["TEST_MONGO_URI"])[config.MONGO_DB].analyzed_messages.count_documents({}) == 2
+
+    assert mongo_client.delete("/api/v1/history", headers=_auth(a)).json() == {"deleted": 0}  # idempotent

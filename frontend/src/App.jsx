@@ -169,7 +169,7 @@ function App() {
       {currentScreen === 'result' && <ResultScreen result={scanResult} onNavigate={navigateTo} />}
       {currentScreen === 'report' && <ReportScreen result={scanResult} onNavigate={navigateTo} />}
       {currentScreen === 'history' && <HistoryScreen history={history} onNavigate={navigateTo} />}
-      {currentScreen === 'settings' && <SettingsScreen privacyMode={privacyMode} setPrivacyMode={setPrivacyMode} isDarkMode={isDarkMode} setIsDarkMode={setIsDarkMode} onNavigate={navigateTo} onLogout={handleLogout} />}
+      {currentScreen === 'settings' && <SettingsScreen privacyMode={privacyMode} setPrivacyMode={setPrivacyMode} isDarkMode={isDarkMode} setIsDarkMode={setIsDarkMode} onNavigate={navigateTo} onLogout={handleLogout} onHistoryDeleted={() => setHistory([])} />}
 
       {/* Notification Overlay */}
       {showNotification && (

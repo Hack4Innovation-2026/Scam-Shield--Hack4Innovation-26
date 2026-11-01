@@ -22,7 +22,8 @@ async def connect_to_mongo():
         await client.admin.command("ping")
         db = client[config.MONGO_DB]
         # Indexes for the queries the stats endpoint runs (newest first, group by verdict).
-        await db.analyzed_messages.create_index([("timestamp", -1)])
+        # The timestamp index doubles as the TTL index that expires old scans.
+        await ensure_scan_expiry(db.analyzed_messages, config.SCAN_RETENTION_DAYS)
         await db.analyzed_messages.create_index([("level", 1), ("timestamp", -1)])
         # Accounts: one user per email; each user's history newest first.
         await db.users.create_index("email", unique=True)
@@ -34,6 +35,58 @@ async def connect_to_mongo():
             await client.close()
         client = None
         db = None
+
+
+SCAN_TIMESTAMP_KEY = [("timestamp", -1)]
+
+
+async def ensure_scan_expiry(collection, days: int) -> str:
+    """Make the {timestamp: -1} index expire scans after `days` days (0: a plain index, no expiry).
+
+    Idempotent across restarts and setting changes. Older databases have this index without TTL,
+    and create_index with the same key but different options raises IndexOptionsConflict, so an
+    existing index is converted in place with collMod. Removing TTL is not something collMod can
+    do, and servers older than 5.1 can't add it, so those cases drop and recreate the index.
+    Never raises: a failure is logged and scans simply don't expire.
+    """
+    seconds = days * 86400
+    try:
+        existing = next(
+            ((name, info) for name, info in (await collection.index_information()).items()
+             if [(k, int(d)) for k, d in info["key"]] == SCAN_TIMESTAMP_KEY),
+            None,
+        )
+        ttl_options = {"expireAfterSeconds": seconds} if seconds else {}
+        if existing is None:
+            await collection.create_index(SCAN_TIMESTAMP_KEY, **ttl_options)
+            action = "created"
+        else:
+            name, info = existing
+            current = info.get("expireAfterSeconds")
+            if current == (seconds or None):
+                action = "unchanged"
+            else:
+                converted = False
+                if seconds:
+                    try:
+                        await collection.database.command(
+                            {"collMod": collection.name, "index": {"name": name, "expireAfterSeconds": seconds}})
+                        converted = True
+                        action = "converted with collMod"
+                    except Exception as e:
+                        logger.info("collMod could not set TTL on %s (%s) - recreating the index", name, e)
+                if not converted:
+                    await collection.drop_index(name)
+                    await collection.create_index(SCAN_TIMESTAMP_KEY, **ttl_options)
+                    action = "dropped and recreated"
+        if seconds:
+            logger.info("Scan retention: %d days (timestamp TTL index %s)", days, action)
+        else:
+            logger.info("Scan retention: kept forever (timestamp index %s, no TTL)", action)
+        return action
+    except Exception as e:
+        logger.warning("Could not set up scan expiry (%s) - scans will not be deleted automatically", e)
+        return "failed"
 
 
 async def close_mongo_connection():
@@ -144,3 +197,9 @@ async def get_user_history(user_id: str, limit: int) -> list[dict]:
         doc["timestamp"] = _as_utc(doc["timestamp"]).isoformat()
         items.append(doc)
     return items
+
+
+async def delete_user_history(user_id: str) -> int:
+    """Permanently delete every scan saved to this user's account. Returns how many were deleted."""
+    result = await db.analyzed_messages.delete_many({"user_id": user_id})
+    return result.deleted_count

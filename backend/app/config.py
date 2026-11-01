@@ -21,6 +21,8 @@ def _csv(value: str) -> list[str]:
 # Empty MONGO_URI disables persistence; the API works without a database.
 MONGO_URI = _env("MONGO_URI")
 MONGO_DB = _env("MONGO_DB", "scam_detection_db")
+# Stored scans are deleted automatically this many days after the scan (MongoDB TTL index). 0 keeps them forever.
+SCAN_RETENTION_DAYS = int(_env("SCAN_RETENTION_DAYS", "90"))
 
 # https://localhost is the Android app (Capacitor WebView origin)
 CORS_ORIGINS = _csv(_env("CORS_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173,https://localhost"))
